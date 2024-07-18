@@ -18,6 +18,7 @@ fi
 # Initialize counters
 html_moved=0
 css_moved=0
+png_moved=0
 
 # Move HTML files up one level
 for file in "$DIR"/*.html; do
@@ -35,6 +36,14 @@ for file in "$DIR"/*.css; do
   fi
 done
 
+# Move PNG files up one level
+for file in "$DIR"/*.png; do
+  if [ -e "$file" ]; then
+    cp "$file" "$(dirname "$DIR")"
+    png_moved=1
+  fi
+done
+
 # Print out whether HTML and CSS files were moved
 if [ $html_moved -eq 1 ]; then
   echo "HTML files were moved."
@@ -46,5 +55,11 @@ if [ $css_moved -eq 1 ]; then
   echo "CSS files were moved."
 else
   echo "No CSS files were found to move."
+fi
+
+if [ $png_moved -eq 1 ]; then
+  echo "PNG files were moved."
+else
+  echo "No PNG files were found to move."
 fi
 
