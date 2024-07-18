@@ -370,10 +370,3 @@ table.imgtable, table.imgtable td {
 	border: none;
 	text-align: left;
 }
-
-hr.double {
-    border: none;
-    border-top: 1px solid #bbb;
-    border-bottom: 1px solid #bbb;
-    height: 0px;
-}

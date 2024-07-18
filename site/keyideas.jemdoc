@@ -1,0 +1,93 @@
+# jemdoc: menu{MENU}{keyideas.html}, nofooter
+== Key Ideas
+
+Knowledge from my courses and self-studying, distilled.
+
+== [statistics.html Statistics]
+=== Statistical Inference
+
+=== Information Theory
+. Data processing inequality
+
+=== Decision Theory
+
+=== Measure Theory
+. Zero-one laws
+.. [statistics.html\#borel-cantelli Borel-Cantelli Lemma]
+.. [statistics.html\#kolmogorov Kolmogorov's Zero-One Law]
+. Lindeberg's method
+
+=== Stochastic Processes
+. Basic limit theorem for Markov chains
+. Martingale convergence
+
+=== [statistics.html\#stochastic-calculus Stochastic Calculus]
+. Ito's calculus
+. Other forms of calculus?
+
+=== High-Dimensional Statistics
+. Randomness simplifies in high dimensions
+. Concentration inequalities
+. Limit theorems
+.. General central limit theorem
+.. 
+
+== Machine Learning
+=== Understanding Neural Networks
+. Student-Teacher
+. Mean-field Theory
+=== Rules-of-thumb
+
+
+== Neuroscience
+=== 
+
+
+== Math
+=== Calculus
+
+=== Differential equations
+
+=== Complex Analysis
+
+=== Linear Algebra
+
+=== Functional Analysis
+. Banach, Hilbert spaces
+. Fourier transforms
+    .. Isomorphism between $\ell^2(\mathbb{Z})$ and $\mathcal{L}^2(\mathbb{T})$
+    .. Convergence theorems
+. Hahn-Banach
+. Spectral theorem
+. Von-Neumann ergodic theorem (review)
+. Lemmas
+    .. Minkowski inequality
+    .. Neumann series
+    .. Arzela-Ascoli
+
+=== Algebra
+
+=== Differential Geometry
+. Fundamental forms, their invariances
+. Geodesics
+. Relation to Lie Theory?
+
+== Physics
+=== Quantum Mechanics
+
+=== Statistical Physics
+. Mean-Field Theory
+. Replica Method
+. Perturbation Theory
+
+== Machine Learning
+=== 
+
+
+== Computer Science
+=== 
+
+
+
+Up Next:
+. Representation Theory
