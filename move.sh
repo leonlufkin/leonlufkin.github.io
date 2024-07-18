@@ -22,7 +22,7 @@ css_moved=0
 # Move HTML files up one level
 for file in "$DIR"/*.html; do
   if [ -e "$file" ]; then
-    mv "$file" "$(dirname "$DIR")"
+    cp "$file" "$(dirname "$DIR")"
     html_moved=1
   fi
 done
@@ -30,7 +30,7 @@ done
 # Move CSS files up one level
 for file in "$DIR"/*.css; do
   if [ -e "$file" ]; then
-    mv "$file" "$(dirname "$DIR")"
+    cp "$file" "$(dirname "$DIR")"
     css_moved=1
   fi
 done
