@@ -1,0 +1,250 @@
+/* Basic reset */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* Global content container */
+.container {
+    max-width: 60em; /* Approx. 960 but scalable */
+    margin: 0 auto; /* Center the container */
+    padding: 2em; /* Relative padding */
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background-color: white;
+    color: #333;
+    line-height: 1.6;
+    padding-top: 5em; /* Adjust this based on the height of your nav bar */
+}
+
+header.site-header {
+    background-image: url("/assets/images/IMG_7220_cropped.png"); Correct the file extension to .jpg
+    background-position: center;
+    background-size: cover;
+    height: 100px; /* Adjust the height as needed */
+    position: relative; /* Allows positioning of the nav inside */
+}
+
+/* Style for name heading on the homepage */
+.name-heading {
+    font-size: 2em; /* Adjust size to make it large */
+    font-weight: bold; /* Make the text bold */
+    text-align: left; /* Center the name */
+    margin-left: 7.5%; /* Make sure the name is not touching the edge */
+    margin-bottom: 1em; /* Add some space below the name */
+}
+
+/* Ensure the nav has no background color */
+nav.site-nav {
+    background-image: url("/assets/images/IMG_7220_cropped.png");
+    background-color: transparent !important; /* Ensure transparency */
+    position: absolute;
+    /* top: 0; */
+    top: 0%; /* Center vertically */
+    left: 50%; /* Center horizontally */
+    transform: translate(-50%, 0%); /* Perfect centering */
+    text-align: center;
+    width: 100%;
+    height: 5em;
+    /* z-index: 1000; */
+    /* padding: 0px 0; */
+
+    /* Background image properties */
+    background-size: cover;
+    background-position: center center;
+    display: flex; /* Use flexbox for centering */
+    justify-content: center; /* Horizontally center the links */
+    align-items: center; /* Vertically center the links */
+}
+
+/* Ensure ul and li elements have transparent background */
+nav.site-nav ul {
+    background-color: transparent !important; /* Ensure transparency */
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    /* display: inline-block; */
+}
+
+nav.site-nav ul li {
+    display: inline-block;
+    margin: 0 15px;
+}
+
+/* Style the nav links with rounded rectangles */
+nav.site-nav ul li a {
+    color: white; /* Text color */
+    background-color: rgba(0, 0, 0, 0.9); /* Semi-transparent background */
+    padding: 6px 12px; /* Adjust padding for a more rectangular shape */
+    border-radius: 10px; /* Lower value for rounded rectangles */
+    text-decoration: none;
+    /* font-weight: bold; */
+    font-size: 1.5em;
+    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.3); /* Optional shadow */
+}
+
+nav.site-nav ul li a:hover {
+    background-color: rgba(0, 0, 0, 1.0); /* Darken more on hover for effect */
+}
+
+/* emove the black banner style from the footer */
+footer {
+    background-color: transparent; /* emoves the black background */
+    color: #333; /* Change text color to something visible on your page background */
+    text-align: center;
+    padding: 20px 0; /* Optional: Add some padding for spacing */
+    font-size: 0.9em; /* Adjust font size as needed */
+    border-top: none; /* emove any top border if present */
+}
+
+
+/* Fix the navigation bar to always be at the top */
+nav.site-nav {
+    position: fixed;
+    top: 0;
+    width: 100%;
+    z-index: 1000;
+    background-color: #333; /* Ensure it has a background */
+    padding: 10px 0;
+}
+
+main {
+    margin-top: 60px; /* Adjust for the fixed nav height */
+}
+
+.name-section {
+    text-align: center;
+    padding: 20px 0;
+}
+
+/* Font Awesome icons */
+.fa {
+    font-family: "Font Awesome 5 Free";
+    font-weight: 900;
+}
+
+/* Academicons */
+.ai {
+    font-family: 'Academicons';
+    font-weight: 400;
+}
+
+/* Apply Merriweather or Freight Text Pro globally */
+body, h1, h2, h3, p, a, li, span, div {
+    font-family: 'Merriweather', serif; /* Or 'Freight Text Pro', serif if using that */
+}
+
+/* Container for the image and text */
+.image-text-container {
+    display: flex; /* Use flexbox for side-by-side layout */
+    align-items: flex-start; /* Align text to the top of the image */
+    margin: 20px 0; /* Add some vertical margin */
+}
+
+/* Style for the image on the left with golden ratio proportions */
+.image-text-container img.left-image {
+    max-width: 38%; /* Image takes roughly 38% of the width */
+    height: auto; /* Keep aspect ratio */
+    margin-right: 20px; /* Space between the image and text */
+}
+
+/* Style for the text on the right */
+.image-text-container .right-text {
+    flex: 1; /* Text takes up the emaining space (about 62%) */
+    padding: 10px; /* Add some padding inside the text area */
+}
+
+/* Increase space between paragraphs */
+p {
+    margin-bottom: 1em; /* Adjust this value for larger or smaller spacing */
+}
+
+.research-page {
+    max-width: 60em; /* Set a maximum width to keep the body narrower */
+    margin: 0 auto; /* Center the content horizontally */
+    padding: 20px;
+    font-size: 1em; /* Decrease the font size overall */
+}
+
+/* Style for publication titles (bold and quoted) */
+.publication {
+    font-size: 1em; /* Adjust the size of the title */
+    margin-bottom: 3em;
+}
+
+.publication p {
+    margin-bottom: 0.3em;
+}
+
+.pub-title {
+    font-weight: bold;
+    /* font-style: italic; */
+    font-size: 1em; /* Adjust the size as needed */
+    display: block; /* Make it behave like a block element (like <p>) */
+    margin-bottom: 0.1em; /* Space below the title */
+}
+
+.pub-authors {
+    /* font-style: italic; */
+    font-size: 1em; /* Adjust the size as needed */
+    display: block; /* Make it behave like a block element (like <p>) */
+    /* color: #8bb3e2; Lighter color for authors */
+    margin-bottom: 0.1em; /* Space below the title */
+}
+
+.pub-venue {
+    font-size: 1em; /* Adjust the size as needed */
+    display: block; /* Make it behave like a block element (like <p>) */
+    margin-bottom: 0.1em; /* Space below the title */
+}
+
+.pub-special {
+    /* font-style: italic; */
+    font-size: 0.8em; /* Adjust the size as needed */
+    display: block; /* Make it behave like a block element (like <p>) */
+    color: #AFD082; /* Lighter color for authors */
+    margin-top: -0.1em; /* Space below the title */
+    margin-bottom: 0.3em; /* Space below the title */
+}
+
+/* Embossed button effect */
+.button {
+    background-color: #1a73e8; /* Change to your preferred color */
+    color: white;
+    border: 1px solid #ccc; /* Light gray border */
+    padding: 4px 8px;
+    text-decoration: none;
+    border-radius: 8px;
+    /* font-size: 14px; */
+    /* text-align: center; */
+    /* display: inline-block; */
+
+    /* Create an embossed look using shadows */
+    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2), -2px -2px 5px rgba(255, 255, 255, 0.8);
+    text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.5);
+    
+    border-radius: 5px; /* Optional: Rounding the edges for a softer look */
+    transition: all 0.3s ease-in-out; /* Smooth transition for hover effect */
+}
+
+/* On hover: give the button a pressed/raised effect */
+.button:hover {
+    box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.2), inset -2px -2px 5px rgba(255, 255, 255, 0.8);
+    background-color: #0f5cbf;
+}
+
+
+/*  */
+/*  */
+/* CV Page */
+/*  */
+/*  */
+
+/* Main Screen Styles */
+body {
+    font-family: Arial, sans-serif;
+    color: #333;
+}

@@ -1,0 +1,125 @@
+/* Main container for the CV */
+.cv-page {
+    width: 100%;
+    max-width: 60em;
+    margin: 0 auto;
+    padding: 1.25em;
+}
+
+/* Center the name on the CV page */
+.cv-page h1, .cv-page .center-info {
+    text-align: center;
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+.cv-page h1 {
+    font-size: 2.5em;
+}
+
+.cv-page h2 {
+    margin-top: 1em;
+    font-size: 1.2em;
+}
+
+/* Flex container for education items */
+.education-item {
+    display: flex;
+    justify-content: space-between; /* Pushes dates to the right */
+    align-items: flex-start; /* Ensures vertical alignment at the top */
+    margin-bottom: 0em; /* Add some spacing between items */
+}
+
+/* Flex container for research items */
+.research-item {
+    display: flex;
+    justify-content: space-between; /* Pushes dates to the right */
+    align-items: flex-start; /* Ensures vertical alignment at the top */
+    margin-bottom: 0em; /* Add some spacing between items */
+}
+
+/* Styling for both education and research sections */
+.content-section {
+    flex-grow: 1;
+    margin-right: 1em;
+}
+
+.content-section ul {
+    list-style-type: none;
+    padding-left: 1.5em;
+}
+
+.content-section ul li {
+    text-indent: -1em;
+    margin-bottom: 0em;
+}
+
+/* Custom en dash for supervisor lines in education and research sections */
+.content-section ul li::before {
+    content: "– "; /* En dash */
+    position: relative;
+    left: 0;
+}
+
+/* Align the dates to the right in both sections */
+.dates {
+    flex-shrink: 0;
+    text-align: right;
+    white-space: nowrap;
+    font-style: italic;
+}
+
+/* Adjust the line spacing between the "Supervised by" line and description */
+.content-section ul li + .description {
+    margin-top: 0.2em; /* Slightly reduce space between supervisor and description */
+    padding-top: 0;
+}
+
+/* Align description with text after the dash */
+.description {
+    margin-top: 0em;
+    padding-left: 1.55em; /* Matches the indentation of the text after the dash */
+}
+
+/* Styling for the email and homepage in the center info section */
+.center-info {
+    text-align: center;
+    margin: 0; /* Remove any additional margins */
+    padding: 0; /* Remove any additional padding */
+}
+
+/* Email and homepage should be in a single line */
+.center-info a {
+    display: inline; /* Ensure they are inline elements */
+    margin-right: 0.5em; /* Adjust space between email and homepage */
+    text-decoration: none; /* Remove underline */
+    color: inherit; /* Keep text color the same */
+}
+
+/* Print-specific styles */
+@media print {
+    body {
+        font-size: 9pt; /* Switch font size to 9pt when printing */
+        font-family: "Palatino", "Palatino Linotype", "Book Antiqua", serif;
+    }
+
+    .cv-page {
+        font-size: 9pt; /* Ensure the CV page also respects 9pt */
+    }
+
+    /* Hide the navigation bar when printing */
+    nav.site-nav {
+        display: none;
+    }
+
+    /* Make email & homepage black and remove underline */
+    .center-info a, .homepage a {
+        color: black;
+        text-decoration: none;
+    }
+
+    /* Ensure the homepage is visible in print */
+    .homepage {
+        display: block;
+    }
+}

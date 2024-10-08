@@ -1,0 +1,94 @@
+/* Define the 'Academicons' font family */
+@font-face {
+    font-family: 'Academicons';
+    font-style: normal;
+    font-weight: 400;
+    font-display: block;
+    src: url(../fonts/academicons.eot);
+    src: url(../fonts/academicons.eot) format('embedded-opentype'),
+         url(../fonts/academicons.ttf) format('truetype'),
+         url(../fonts/academicons.woff) format('woff'),
+         url(../fonts/academicons.svg) format('svg');
+}
+
+/* Basic setup for elements with 'ai' class, using the Academicons font */
+.ai {
+    font-family: 'Academicons';
+    font-weight: 400;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-font-smoothing: antialiased;
+    display: inline-block;
+    font-style: normal;
+    font-variant: normal;
+    text-rendering: auto;
+    line-height: 1;
+}
+
+/* Academia.edu icon */
+.ai-academia:before { content: "\e9af"; }
+.ai-academia-square:before { content: "\e93d"; }
+
+/* ACM (Association for Computing Machinery) icon */
+.ai-acm:before { content: "\e93c"; }
+.ai-acm-square:before { content: "\e95d"; }
+
+/* arXiv preprint server icon */
+.ai-arxiv:before { content: "\e974"; }
+.ai-arxiv-square:before { content: "\e9a6"; }
+
+/* bioRxiv preprint server icon */
+.ai-biorxiv:before { content: "\e9a2"; }
+.ai-biorxiv-square:before { content: "\e98b"; }
+
+/* Elsevier icon */
+.ai-elsevier:before { content: "\e961"; }
+.ai-elsevier-square:before { content: "\e910"; }
+
+/* ORCID (Open Researcher and Contributor ID) icon */
+.ai-orcid:before { content: "\e9d9"; }
+.ai-orcid-square:before { content: "\e9c3"; }
+
+/* Google Scholar icon */
+.ai-google-scholar:before { content: "\e9d4"; }
+.ai-google-scholar-square:before { content: "\e9f9"; }
+
+/* IEEE (Institute of Electrical and Electronics Engineers) icon */
+.ai-ieee:before { content: "\e929"; }
+.ai-ieee-square:before { content: "\e9b9"; }
+
+/* Zenodo icon */
+.ai-zenodo:before { content: "\e911"; }
+
+/* Icon Sizes */
+.ai-1x { font-size: 1em; }
+.ai-2x { font-size: 2em; }
+.ai-3x { font-size: 3em; }
+.ai-4x { font-size: 4em; }
+.ai-5x { font-size: 5em; }
+.ai-6x { font-size: 6em; }
+/* ... up to 10x */
+
+/* Utility Classes */
+
+/* Center align text and icon width */
+.ai-fw { text-align: center; width: 1.25em; }
+
+/* List styles */
+.ai-ul { list-style-type: none; margin-left: 2.5em; padding-left: 0; }
+.ai-ul > li { position: relative; }
+.ai-li { left: -2em; position: absolute; text-align: center; width: 2em; }
+
+/* Adding a border around icons */
+.ai-border { border: solid 0.08em #eee; border-radius: 0.1em; padding: 0.2em 0.25em 0.15em; }
+
+/* Floating icons */
+.ai-pull-left { float: left; margin-right: 0.3em; }
+.ai-pull-right { float: right; margin-right: 0.3em; }
+
+/* Stacked icons */
+.ai-stack { display: inline-block; height: 2em; line-height: 2em; position: relative; vertical-align: middle; width: 2.5em; }
+.ai-stack-1x, .ai-stack-2x { left: 0; position: absolute; text-align: center; width: 100%; }
+.ai-stack-2x { font-size: 2em; }
+
+/* Inverse colors (white on dark backgrounds) */
+.ai-inverse { color: #fff; }
