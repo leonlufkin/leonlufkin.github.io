@@ -1,0 +1,700 @@
+/* Leon Lufkin — personal site. Single stylesheet.
+   Light/dark follows the system preference (overridable via the toggle). */
+
+/* Latin Modern — Knuth's Computer Modern as OpenType (GUST, GUST Font License):
+   the genuine LaTeX face, self-hosted and subset to Latin. font-display: swap
+   means it never blocks first paint; Georgia is the fallback until it loads. */
+@font-face {
+  font-family: "Latin Modern Roman";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/lmroman-regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Latin Modern Roman";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/lmroman-italic.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Latin Modern Roman";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/lmroman-bold.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Latin Modern Roman";
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/lmroman-bolditalic.woff2") format("woff2");
+}
+
+/* Metric-matched fallback: local Georgia adjusted to Latin Modern's metrics,
+   so the font swap on first visit causes (near) zero layout shift */
+@font-face {
+  font-family: "Georgia LM";
+  src: local("Georgia");
+  size-adjust: 98.64%;
+  ascent-override: 114.25%;
+  descent-override: 29.4%;
+  line-gap-override: 0%;
+}
+
+:root {
+  --bg: #ffffff;
+  --text: #1a1a1a;
+  --muted: #666666;
+  --line: #e5e5e5;
+  --accent: #0645ad;
+  --accent-soft: #dce6f5;
+  --wash: rgba(255, 255, 255, 0.63);
+  --sky: #8aa3c9; /* sampled from the photo's own sky; fills width beyond the image */
+}
+
+/* Dark palette applies when forced via the toggle (html.dark), or — for the
+   initial visit / no-JS — when the system prefers dark and light isn't forced */
+:root.dark {
+  --bg: #141414;
+  --text: #e8e8e8;
+  --muted: #9a9a9a;
+  --line: #2a2a2a;
+  --accent: #8cb4ff;
+  --accent-soft: #1c2c4a;
+  --wash: rgba(14, 14, 14, 0.65);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --bg: #141414;
+    --text: #e8e8e8;
+    --muted: #9a9a9a;
+    --line: #2a2a2a;
+    --accent: #8cb4ff;
+    --accent-soft: #1c2c4a;
+    --wash: rgba(14, 14, 14, 0.65);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: light dark;
+}
+
+.print-only {
+  display: none;
+}
+
+/* Background photo behind a translucent wash, fixed to the viewport.
+   Rule: a photo is never zoomed in. It renders whole at its natural aspect
+   (contain), centered. Under it, an optional AI-widened variant (--bg-wide)
+   extends the scene on wide windows — its low-res center stays hidden behind
+   the sharp original. Beyond both, the photo's own averaged edge color
+   (--sky, from the manifest) fills the rest. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(var(--wash), var(--wash)),
+    var(--bg-image, url("../images/background-web.jpg")) var(--bg-pos, center) / var(--bg-size, contain) no-repeat,
+    var(--bg-wide, none) center / auto 100% no-repeat var(--sky);
+}
+
+/* Squarish/tall windows: the original may fit by width there, which would
+   misalign the height-fitted widened layer — drop it and keep the plain fill */
+@media (max-aspect-ratio: 4/3) {
+  body::before {
+    background:
+      linear-gradient(var(--wash), var(--wash)),
+      var(--bg-image, url("../images/background-web.jpg")) center / contain no-repeat var(--sky);
+  }
+}
+
+body {
+  margin: 0 auto;
+  max-width: 44rem;
+  padding: 3.25rem 1.5rem 2.5rem;
+  overflow-x: hidden; /* the cloud plates extend past the boxes */
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Latin Modern Roman", "Georgia LM", Georgia, "Times New Roman", Times, serif;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Photo gallery (opened from the nav ▦) ---------------------------------- */
+
+#gallery {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  display: none;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: var(--bg);
+  padding: 4rem 1.25rem 2.5rem;
+}
+
+:root.gallery-open #gallery {
+  display: block;
+}
+
+:root.gallery-open body {
+  overflow: hidden; /* lock page scroll behind the gallery */
+}
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 1rem 0.9rem;
+  max-width: 64rem;
+  margin: 0 auto;
+}
+
+.gallery-grid figure {
+  margin: 0;
+  cursor: pointer;
+}
+
+.gallery-grid img {
+  display: block;
+  width: 100%;
+  height: 110px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+}
+
+.gallery-grid figcaption {
+  margin-top: 0.3rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-style: italic;
+}
+
+.gallery-close {
+  position: fixed;
+  top: 12px;
+  right: 14px;
+  z-index: 6;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+@media (max-width: 620px) {
+  .gallery-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+
+  .gallery-grid img {
+    height: 90px;
+  }
+}
+
+/* Faint location label for the background photo, bottom-left ------------- */
+
+.bg-label {
+  position: fixed;
+  left: 16px;
+  bottom: 12px;
+  z-index: 1;
+  color: var(--text);
+  opacity: 0.32;
+  font-size: 0.8rem;
+  font-style: italic;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Navigation ------------------------------------------------------------- */
+
+header {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 3rem;
+}
+
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.6rem;
+}
+
+nav a {
+  color: var(--text);
+  font-size: 1rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+nav a:hover {
+  text-decoration-thickness: 2px;
+}
+
+nav a[aria-current="page"] {
+  font-weight: 700;
+}
+
+/* Light/dark toggle (button injected into the nav by site.js) ------------ */
+
+.theme-toggle {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 1.0625rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* Headings --------------------------------------------------------------- */
+
+h1 {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+h2 {
+  margin: 1.75rem 0 0.55rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+/* Content pages (research, CV, 404): same box as home, tighter and denser.
+   Default box: solid fill + hairline border. An optional cloud halo (the
+   ::before plate, opt-in via the preview tool) can feather it into the photo:
+     --cloud-display  block to show the halo (default: hidden)
+     --cloud-reach    how far the plate extends beyond the box
+     --cloud-blur     softness of the falloff
+     --box-fill       fill color/opacity (preview tool can override) */
+body:not(.home) main {
+  position: relative;
+  padding: 1.4rem 1.6rem 1.8rem;
+  background: var(--box-fill, var(--bg));
+  border: 1px solid var(--text);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.intro::before,
+body:not(.home) main::before {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--cloud-reach, 0px));
+  z-index: -1;
+  display: var(--cloud-display, none);
+  background: var(--box-fill, var(--bg));
+  border-radius: var(--cloud-radius, 24px);
+  filter: blur(var(--cloud-blur, 0px));
+}
+
+/* Home ------------------------------------------------------------------- */
+
+body.home {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100svh;
+}
+
+body.home main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.6rem;
+}
+
+.intro {
+  position: relative;
+  max-width: 36rem;
+  padding: 2rem 2.25rem;
+  background: var(--box-fill, var(--bg));
+  border: 1px solid var(--text);
+  text-align: center;
+}
+
+.headshot {
+  display: block;
+  width: 158px;
+  height: auto;
+  margin: 0 auto 0.55rem;
+}
+
+.intro-name {
+  margin: 0 0 1.2rem;
+  font-style: italic;
+}
+
+.intro p {
+  margin: 0 0 1.1rem;
+}
+
+.intro p:last-child {
+  margin-bottom: 0;
+}
+
+/* Publications ----------------------------------------------------------- */
+
+.pubs {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pub {
+  padding: 0.7rem 0;
+}
+
+.pub + .pub {
+  border-top: 1px solid var(--line);
+}
+
+.pub p {
+  margin: 0;
+}
+
+.pub-title {
+  font-weight: 700;
+}
+
+.pub-title a {
+  color: inherit;
+}
+
+.pub-title a:hover {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.pub-authors {
+  margin-top: 0.05rem;
+}
+
+.me {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.pub-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 1rem;
+  margin-top: 0.1rem;
+  color: var(--muted);
+}
+
+.pub-meta .right {
+  margin-left: auto; /* links/awards sit on the right edge */
+}
+
+.pub-note {
+  margin-top: 0.05rem;
+  color: var(--muted);
+}
+
+/* CV --------------------------------------------------------------------- */
+
+.cv-contact {
+  margin: -0.7rem 0 0;
+  color: var(--muted);
+}
+
+.cv-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.15rem 1.5rem;
+  margin-bottom: 0.8rem;
+}
+
+.cv-item:last-child {
+  margin-bottom: 0;
+}
+
+.cv-main {
+  flex: 1;
+  min-width: 0;
+}
+
+/* label on the left, value pushed to the right edge */
+.cv-split {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.15rem 1rem;
+}
+
+.cv-sup {
+  font-style: italic;
+}
+
+.wrapok {
+  white-space: normal;
+  text-align: right;
+}
+
+.cv-title {
+  margin: 0;
+  font-weight: 700;
+}
+
+.cv-sub {
+  margin: 0.05rem 0 0;
+  color: var(--muted);
+}
+
+.cv-sub a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 3px;
+}
+
+.cv-sub a:hover {
+  color: var(--accent);
+}
+
+/* right-hand column stacking a date with lines under it, right-aligned */
+.cv-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.cv-date {
+  flex-shrink: 0;
+  padding-top: 0.1rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.cv-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cv-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.15rem 1.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.cv-list li > span:first-child {
+  min-width: 0;
+}
+
+.cv-prose {
+  margin: 0;
+}
+
+/* Small screens ---------------------------------------------------------- */
+
+@media (max-width: 620px) {
+  body {
+    padding-top: 2.25rem;
+  }
+
+  .intro {
+    padding: 1.5rem 1.25rem;
+  }
+
+  .cv-item,
+  .cv-list li {
+    flex-direction: column;
+  }
+
+  .cv-right {
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .cv-date {
+    padding-top: 0;
+  }
+}
+
+/* Print: render the CV as a clean LaTeX-style document — no photo, no chrome,
+   just black text on white. Screen appearance is unaffected. ------------- */
+
+@media print {
+  :root,
+  :root.dark,
+  :root.light {
+    --bg: #fff;
+    --text: #000;
+    --muted: #000;
+    --line: #000;
+    --accent: #000;
+  }
+
+  @page {
+    margin: 0.75in;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  body {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+    color: #000;
+    font-family: "Latin Modern Roman", "Times New Roman", Times, serif;
+    font-size: 10.5pt;
+    line-height: 1.35;
+  }
+
+  /* strip everything that isn't the CV text */
+  body::before,
+  main::before,
+  header,
+  nav,
+  .theme-toggle,
+  #style-switcher,
+  .bg-label,
+  .screen-only {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  body:not(.home) main {
+    position: static;
+    padding: 0;
+    border: none;
+    background: none;
+    font-size: 10.5pt;
+    line-height: 1.35;
+  }
+
+  /* centered name title, like a LaTeX \title */
+  .cv-printhead {
+    text-align: center;
+    margin-bottom: 1.1rem;
+  }
+
+  .cv-printhead h1 {
+    margin: 0 0 0.2rem;
+    font-size: 20pt;
+    font-weight: 700;
+  }
+
+  .cv-printhead p {
+    margin: 0;
+    font-size: 10.5pt;
+  }
+
+  /* section headings: bold title-case, no rule — exactly like the LaTeX CV */
+  h2 {
+    margin: 1.05rem 0 0.4rem;
+    font-size: 12.5pt;
+    font-weight: 700;
+    break-after: avoid;
+  }
+
+  a {
+    color: #000;
+    text-decoration: none;
+  }
+
+  .cv-sub a {
+    text-decoration: none;
+  }
+
+  /* don't split an entry across a page break */
+  .cv-item,
+  .cv-list li {
+    break-inside: avoid;
+    margin-bottom: 0.45rem;
+  }
+
+  .cv-list li {
+    margin-bottom: 0.2rem;
+  }
+
+  /* LaTeX itemize: "– Supervised by …" with hanging indent; description
+     lines align under the text after the dash, with no dash of their own */
+  .cv-main .cv-sub {
+    padding-left: 2.05em;
+  }
+
+  .cv-main p.cv-sup {
+    text-indent: -0.85em;
+  }
+
+  .cv-sup::before {
+    content: "\2013\00a0";
+  }
+
+  .cv-main .cv-split {
+    padding-left: 1.2em; /* flex row: dash renders inline inside the span */
+  }
+
+  .cv-list li {
+    padding-left: 1.2em;
+  }
+
+  .cv-list li::before {
+    content: "\2013";
+    margin-right: 0.45em;
+  }
+
+  /* belt-and-suspenders: never print a box on any page */
+  .intro,
+  body:not(.home) main {
+    border: none !important;
+    background: none !important;
+    box-shadow: none !important;
+  }
+
+  .intro::before,
+  body:not(.home) main::before {
+    display: none !important;
+  }
+}

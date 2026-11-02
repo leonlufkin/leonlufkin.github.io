@@ -1,155 +1,86 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Research</title>
-
-    <!-- Stylesheets -->
-    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@300;400;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    
-    <!-- Conditionally load LaTeX CSS for the CV page -->
-    <!--  -->
-    
-    <link rel="stylesheet" href="/assets/css/main.css">
-    <link rel="stylesheet" href="/assets/css/cv.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Research · Leon Lufkin</title>
+  <meta name="description" content="Publications and preprints by Leon Lufkin.">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="assets/fonts/lmroman-regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="assets/css/style.css?v=33">
+  <link rel="prefetch" href="index.html">
+  <link rel="prefetch" href="cv.html">
+  <script>/* pre-paint bootstrap: saved theme + this session's background */
+(function(){var d=document.documentElement;try{var t=localStorage.getItem("theme");if(t)d.classList.add(t);var p=JSON.parse(sessionStorage.getItem("bg")||"null");var k=(t?t==="dark":matchMedia("(prefers-color-scheme: dark)").matches)?"d":"l";if(p&&p.m===k){d.style.setProperty("--bg-image",'url("'+p.u+'")');d.style.setProperty("--sky",p.c);if(p.w){d.style.setProperty("--bg-wide",'url("'+p.w+'")');if(p.s!=null){d.style.setProperty("--bg-size","auto "+p.s+"%");d.style.setProperty("--bg-pos","center "+p.y+"%");}}}}catch(e){}})();</script>
+  <script src="assets/js/backgrounds.js?v=12" defer></script>
+  <script src="assets/js/gate.js?v=1" defer></script>
+  <script src="assets/js/site.js?v=9" defer></script>
 </head>
 
 <body>
-    <!-- Navigation Menu -->
-    <nav class="site-nav">
-        <div class="menu">
-            <ul>
-                <li><a href="/">Home</a></li>
-                <li><a href="/research">Research</a></li>
-                <li><a href="/cv">CV</a></li>
-            </ul>
-        </div>
+  <header>
+    <nav>
+      <a href="index.html">Leon</a>
+      <a href="research.html" aria-current="page">Research</a>
+      <a href="cv.html">CV</a>
     </nav>
+  </header>
 
-    <!-- Site Header -->
-    <!-- <header class="site-header"> -->
-        <!-- <div class="wrapper"> -->
-            <!-- Banner will only contain the background now, no text here -->
-        <!-- </div> -->
-    <!-- </header> -->
-    
-    <!-- Move name and info below the banner -->
-    <!-- <section class="name-section">
-        <div class="wrapper">
-            <h1 class="my-name">Leon Lufkin</h1>
-            <p>Undergraduate Student, Statistics & Data Science, Mathematics</p>
-        </div>
-    </section> -->
+  <main>
+    <!-- TODO: add a Research Topics section here (Leon, July 2026) -->
+    <ul class="pubs">
+      <li class="pub">
+        <p class="pub-title"><a href="https://arxiv.org/abs/2603.22325">Hybrid associative memories</a></p>
+        <p class="pub-authors"><span class="me">Leon Lufkin</span>, Tomás Figliolia, Beren Millidge, Kamesh Krishnamurthy</p>
+        <p class="pub-meta"><span>Preprint, 2026</span></p>
+      </li>
 
-    <!-- Main Content -->
-    <main class="container">
-        <div class="research-page">
+      <li class="pub">
+        <p class="pub-title">Nonlinear dynamics of localization in neural receptive fields</p>
+        <p class="pub-authors"><span class="me">Leon Lufkin</span>, Andrew Saxe, Erin Grant</p>
+        <p class="pub-meta"><span><em>Advances in Neural Information Processing Systems (NeurIPS)</em>, 2024</span></p>
+        <p class="pub-note">Spotlight (&lt;4% of submissions)</p>
+      </li>
 
-    <div class="publication">
-        <span class="pub-title">&ldquo;Nonlinear dynamics of localization in neural receptive fields.&rdquo;</span>
-        <span class="pub-authors">
-            <span class="author">Leon Lufkin</span>, 
-            <span class="author">Andrew Saxe</span>, 
-            <span class="author">Erin Grant</span>.
-        </span>
-        <span class="pub-venue"><em>Advances in Neural Information Processing Systems (NeurIPS)</em>, 2024</span>
-        <span class="pub-special"><strong>Spotlight</strong> presentation (&lt;4% of submissions).</span>
-        <!-- <a href="#" class="button" target="_blank">article</a> -->
-    </div>
+      <li class="pub">
+        <p class="pub-title"><a href="https://arxiv.org/abs/2402.09693">Sharp information-theoretic thresholds for shuffled linear regression</a></p>
+        <p class="pub-authors"><span class="me">Leon Lufkin</span>, Yihong Wu, Jiaming Xu</p>
+        <p class="pub-meta"><span><em>International Symposium on Information Theory (ISIT)</em>, 2024</span></p>
+      </li>
 
-    <div class="publication">
-        <span class="pub-title">&ldquo;Sharp Information-Theoretic Thresholds for Shuffled Linear Regression.&rdquo;</span>
-        <span class="pub-authors">
-            <span class="author">Leon Lufkin</span>, 
-            <span class="author">Yihong Wu</span>, 
-            <span class="author">Jiaming Xu</span>.
-        </span>
-        <span class="pub-venue"><em>International Symposium on Information Theory (ISIT)</em>, 2024</span>
-        <a href="https://arxiv.org/abs/2402.09693" class="button" target="_blank">article</a>
-    </div>
+      <li class="pub">
+        <p class="pub-title"><a href="https://arxiv.org/abs/2309.00597">The QUATRO application suite: quantum computing for models of human cognition</a></p>
+        <p class="pub-authors">Raghavendra Pothukuchi, <span class="me">Leon Lufkin</span>, &hellip;, Jonathan Cohen, Abhishek Bhattacharjee</p>
+        <p class="pub-meta"><span>Preprint, 2023</span></p>
+      </li>
 
-    <div class="publication">
-        <span class="pub-title">&ldquo;The QUATRO Application Suite: Quantum Computing for Models of Human Cognition.&rdquo;</span>
-        <span class="pub-authors">
-            <span class="author">Raghavendra Pothukuchi</span>, 
-            <span class="author">Leon Lufkin</span>, 
-            <span> ..., </span>
-            <span class="author">Jonathan Cohen</span>, 
-            <span class="author">Abhishek Bhattacharjee</span>.
-        </span>
-        <span class="pub-venue">Under review at <em>International Symposium on High-Performance Computer Architecture (HPCA)</em>, 2023</span>
-        <a href="https://arxiv.org/abs/2309.00597" class="button" target="_blank">preprint</a>
-    </div>
+      <li class="pub">
+        <p class="pub-title"><a href="https://www.frontiersin.org/journals/epidemiology/articles/10.3389/fepid.2023.1216497/full">A stronger association of depression with rheumatoid arthritis in presence of obesity and hypertriglyceridemia</a></p>
+        <p class="pub-authors">Grayden Shand, Daniel T. Fuller, <span class="me">Leon Lufkin</span>, Carly Lovelett, Nabendu Pal, Sumona Mondal, Shantanu Sur</p>
+        <p class="pub-meta"><span><em>Frontiers in Epidemiology</em>, 2023</span></p>
+      </li>
 
-    <div class="publication">
-        <span class="pub-title">&ldquo;A stronger association of depression with rheumatoid arthritis in presence of obesity and hypertriglyceridemia.&rdquo;</span>
-        <span class="pub-authors">
-            <span class="author">Grayden Shand</span>, 
-            <span class="author">Daniel T Fuller</span>, 
-            <span class="author">Leon Lufkin</span>, 
-            <span class="author">Carly Lovelett</span>, 
-            <span class="author">Nabendu Pal</span>, 
-            <span class="author">Sumona Mondal</span>, 
-            <span class="author">Shantanu Sur</span>.
-        </span>
-        <span class="pub-venue"><em>Frontiers in Epidemiology</em>, 2023</span>
-        <a href="https://www.frontiersin.org/journals/epidemiology/articles/10.3389/fepid.2023.1216497/full" class="button" target="_blank">article</a>
-    </div>
+      <li class="pub">
+        <p class="pub-title"><a href="https://www.frontiersin.org/journals/molecular-biosciences/articles/10.3389/fmolb.2022.1009402/full">Glis1 and oxaloacetate in nucleus pulposus stromal cell somatic reprogramming and survival</a></p>
+        <p class="pub-authors"><span class="me">Leon Lufkin</span>, Ankita Samanta, &hellip;, Petra Kraus</p>
+        <p class="pub-meta"><span><em>Frontiers in Molecular Biosciences</em>, 2022</span></p>
+      </li>
 
-    <div class="publication">
-        <span class="pub-title">&ldquo;Glis1 and oxaloacetate in nucleus pulposus stromal cell somatic reprogramming and survival.&rdquo;</span>
-        <span class="pub-authors">
-            <span class="author">Leon Lufkin</span>, 
-            <span class="author">Ankita Samanta</span>, 
-            <span> ..., </span>
-            <span class="author">Petra Kraus</span>.
-        </span>
-        <span class="pub-venue"><em>Frontiers in Molecular Biosciences</em>, 2022</span>
-        <a href="https://www.frontiersin.org/journals/molecular-biosciences/articles/10.3389/fmolb.2022.1009402/full" class="button" target="_blank">article</a>
-    </div>
+      <li class="pub">
+        <p class="pub-title"><a href="https://arxiv.org/abs/2205.13614">Emergent organization of receptive fields in networks of excitatory and inhibitory neurons</a></p>
+        <p class="pub-authors"><span class="me">Leon Lufkin</span>, Ashish Puri, Ganlin Song, Xinyi Zhong, John Lafferty</p>
+        <p class="pub-meta"><span>Preprint, 2022</span></p>
+      </li>
 
-    <div class="publication">
-        <span class="pub-title">&ldquo;Emergent organization of receptive fields in networks of excitatory and inhibitory neurons.&rdquo;</span>
-        <span class="pub-authors">
-            <span class="author">Leon Lufkin</span>, 
-            <span class="author">Ashish Puri</span>, 
-            <span class="author">Ganlin Song</span>, 
-            <span class="author">Xinyi Zhong</span>, 
-            <span class="author">John Lafferty</span>.
-        </span>
-        <span class="pub-venue"><em>arXiv preprint</em>, 2022</span>
-        <a href="https://arxiv.org/abs/2205.13614" class="button" target="_blank">preprint</a>
-    </div>
+      <li class="pub">
+        <p class="pub-title"><a href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8415718/">A Bayesian model to analyze the association of rheumatoid arthritis with risk factors and their interactions</a></p>
+        <p class="pub-authors"><span class="me">Leon Lufkin</span>, Marko Budišić, Sumona Mondal, Shantanu Sur</p>
+        <p class="pub-meta"><span><em>Frontiers in Public Health</em>, 2021</span></p>
+      </li>
+    </ul>
+  </main>
 
-    <div class="publication">
-        <span class="pub-title">&ldquo;A Bayesian model to analyze the association of rheumatoid arthritis with risk factors and their interactions.&rdquo;</span>
-        <span class="pub-authors">
-            <span class="author">Leon Lufkin</span>, 
-            <span class="author">Marko Budišić</span>, 
-            <span class="author">Sumona Mondal</span>, 
-            <span class="author">Shantanu Sur</span>.
-        </span>
-        <span class="pub-venue"><em>Frontiers in Public Health</em>, 2021</span>
-        <a href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8415718/" class="button" target="_blank">article</a>
-    </div>
-
-</div>
-
-<script src="/assets/js/site.js"></script>
-
-
-    </main>
-
-    <!-- Footer -->
-    <footer>
-        <p>&copy; 2024 Leon Lufkin</p>
-    </footer>
-
-    <!-- JavaScript Files -->
-    <script src="/assets/js/cash-4.1.5.min.js"></script>
-    <script src="/assets/js/site.js"></script>
+  <!-- TEMPORARY font/border preview tool — remove when decided -->
+  <script src="assets/js/switcher.js?v=20" defer></script>
 </body>
 </html>

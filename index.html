@@ -1,89 +1,42 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leon Lufkin | Home</title>
-
-    <!-- Stylesheets -->
-    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@300;400;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    
-    <!-- Conditionally load LaTeX CSS for the CV page -->
-    <!--  -->
-    
-    <link rel="stylesheet" href="/assets/css/main.css">
-    <link rel="stylesheet" href="/assets/css/cv.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leon Lufkin</title>
+  <meta name="description" content="Leon Lufkin — researcher at Zyphra working on new architectures for AI models.">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="assets/fonts/lmroman-regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="assets/css/style.css?v=33">
+  <link rel="prefetch" href="research.html">
+  <link rel="prefetch" href="cv.html">
+  <script>/* pre-paint bootstrap: saved theme + this session's background */
+(function(){var d=document.documentElement;try{var t=localStorage.getItem("theme");if(t)d.classList.add(t);var p=JSON.parse(sessionStorage.getItem("bg")||"null");var k=(t?t==="dark":matchMedia("(prefers-color-scheme: dark)").matches)?"d":"l";if(p&&p.m===k){d.style.setProperty("--bg-image",'url("'+p.u+'")');d.style.setProperty("--sky",p.c);if(p.w){d.style.setProperty("--bg-wide",'url("'+p.w+'")');if(p.s!=null){d.style.setProperty("--bg-size","auto "+p.s+"%");d.style.setProperty("--bg-pos","center "+p.y+"%");}}}}catch(e){}})();</script>
+  <script src="assets/js/backgrounds.js?v=12" defer></script>
+  <script src="assets/js/gate.js?v=1" defer></script>
+  <script src="assets/js/site.js?v=9" defer></script>
 </head>
 
-<body>
-    <!-- Navigation Menu -->
-    <nav class="site-nav">
-        <div class="menu">
-            <ul>
-                <li><a href="/">Home</a></li>
-                <li><a href="/research">Research</a></li>
-                <li><a href="/cv">CV</a></li>
-            </ul>
-        </div>
+<body class="home">
+  <main>
+    <section class="intro">
+      <img class="headshot" src="assets/images/headshot-web.jpg" alt="Leon Lufkin" width="566" height="640">
+      <p class="intro-name">Leon Lufkin</p>
+      <p>I am a researcher at Zyphra, where I develop new architectures for AI models.
+      I also work on problems in statistics and neuroscience.</p>
+
+      <p>I studied statistics and math at Yale as an undergrad.
+      I was fortunate to do research there, at Princeton, and at the Gatsby Unit (UCL).</p>
+    </section>
+
+    <nav>
+      <a href="index.html" aria-current="page">Leon</a>
+      <a href="research.html">Research</a>
+      <a href="cv.html">CV</a>
     </nav>
+  </main>
 
-    <!-- Site Header -->
-    <!-- <header class="site-header"> -->
-        <!-- <div class="wrapper"> -->
-            <!-- Banner will only contain the background now, no text here -->
-        <!-- </div> -->
-    <!-- </header> -->
-    
-    <!-- Move name and info below the banner -->
-    <!-- <section class="name-section">
-        <div class="wrapper">
-            <h1 class="my-name">Leon Lufkin</h1>
-            <p>Undergraduate Student, Statistics & Data Science, Mathematics</p>
-        </div>
-    </section> -->
-
-    <!-- Main Content -->
-    <main class="container">
-        <div class="name-heading">
-   Leon Lufkin
-</div>
-
-<div class="image-text-container">
-    <img src="/assets/images/headshot.png" alt="My Image Description" class="left-image" />
-    <div class="right-text">
-      <p>I am an undergrad at Yale majoring in Statistics &amp; Data Science and Mathematics.
-      <!-- I was inducted into Phi Beta Kappa in my junior year. -->
-      I plan to graduate in Fall 2024.</p>
-
-      <p>I am broadly interested in inference and learning.
-      My research has largely been at the intersection of machine learning and computational neuroscience.
-      I have been fortunate to work with <a href="https://statistics.yale.edu/people/john-lafferty">John Lafferty (Yale)</a> and <a href="https://pni.princeton.edu/people/jonathan-cohen">Jonathan Cohen (Princeton)</a> during my summers.
-      In Fall 2023, I took time off from school to work as a Project Research Intern at the Gatsby Unit with <a href="https://www.saxelab.org/">Andrew Saxe (UCL)</a>.
-      This work was just accepted to NeurIPS 2024 as a spotlight presentation.
-      </p>
-
-      <p>
-      I am also interested in more classical statistical problems.
-      I have worked with <a href="http://www.stat.yale.edu/~yw562/">Yihong Wu (Yale)</a> on studying shuffled linear regression, for which I won the Hartigan Prize from the Yale stats department.
-      I recently presented our work at ISIT 2024.</p>
-    </div>
-</div>
-
-<!-- <section>
-   
-</section> -->
-
-    </main>
-
-    <!-- Footer -->
-    <footer>
-        <p>&copy; 2024 Leon Lufkin</p>
-    </footer>
-
-    <!-- JavaScript Files -->
-    <script src="/assets/js/cash-4.1.5.min.js"></script>
-    <script src="/assets/js/site.js"></script>
+  <!-- TEMPORARY font/border preview tool — remove when decided -->
+  <script src="assets/js/switcher.js?v=20" defer></script>
 </body>
 </html>
