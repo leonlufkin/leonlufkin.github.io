@@ -7,9 +7,10 @@
 
   // Bump ASSET_V whenever tools/bake-bay.py rewrites the textures/metadata:
   // the browser otherwise serves the stale cached bake for the bare URLs.
-  var ASSET_V = '8';
+  var ASSET_V = '9';
 
   function mount() {
+    window.__log = (window.__log || []); window.__log.push('mount called');
     var stage = document.createElement('div');
     stage.id = 'bay-stage';
     stage.setAttribute('aria-hidden', 'true');
@@ -20,15 +21,23 @@
       // browser serve a stale cached copy (old json lacks the band fields
       // the shaders need)
       meta: '/assets/images/kea/bay.json?v=' + ASSET_V + '&t=' + Date.now(),
-      onFail: function (reason) { window.__bayFail = 'onFail: ' + reason; stage.remove(); }
     };
     var body = mountBayBody(stage, opts);
     var dive = mountBayDive(stage, opts);
+    stage.appendChild(body.canvas);
+    stage.appendChild(dive.canvas);
+    document.body.appendChild(stage);
+    window.__log.push('stage in DOM: ' + !!document.getElementById('bay-stage'));
+    (function poll(t) {
+      setTimeout(function () {
+        var present = !!document.getElementById('bay-stage');
+        window.__log.push('t+' + t + 'ms stage: ' + present);
+        if (t < 3000) poll(t + 500);
+      }, 500);
+    })(0);
     // canvas sizing lives in the stylesheet (#bay-stage canvas fills the
-    // Hide the static photo only once both live layers have actually painted:
-    // has-bay before that would flash the page background instead. Draw once
-    // synchronously first — a backgrounded tab starves rAF, and without this
-    // the canvases would stay blank until it becomes visible.
+    // window); the shaders fit the painting inside (top edge = window top,
+    // bottom edge = window bottom, colours extended beyond)
     return Promise.all([body.ready, dive.ready]).then(function () {
       body.draw(performance.now());
       dive.draw(performance.now());
@@ -40,9 +49,8 @@
     }).then(function () {
       document.documentElement.classList.add('has-bay');
     }).catch(function (e) {
-      // either layer failed: fall back to the static photo
+      window.__log.push('CATCH: ' + ((e && e.message) || String(e)).slice(0, 200));
       console.error('bay mount failed:', e && e.message || e);
-      window.__bayFail = String(e && e.message || e);
       stage.remove();
       throw e;
     });
