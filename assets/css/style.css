@@ -110,6 +110,39 @@ body::before {
     var(--bg-rows-right, none) right / 50% 100% no-repeat var(--sky);
 }
 
+/* The living watercolor (bay-body.js + bay-dive.js). Sits at z -2.5: above
+   the static photo layer (-2), below the content. Once mounted, the static
+   photo layer hides — the canvases repaint the same watercolor, alive. */
+#bay-stage {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  /* feather the letterbox seam: the canvas edges melt into the --sky fill */
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 4%, #000 96%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 4%, #000 96%, transparent);
+}
+#bay-stage::after {
+  /* the same wash the static photo layers wear, so text contrast matches */
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(var(--wash), var(--wash));
+}
+#bay-stage canvas {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(100vw, calc(100vh * 2048 / 917));
+  height: min(100vh, calc(100vw * 917 / 2048));
+  width: min(100vw, calc(100dvh * 2048 / 917));
+  height: min(100vh, calc(100dvw * 917 / 2048));
+}
+.has-bay body::after {
+  visibility: hidden;
+}
+
 body::after {
   content: "";
   position: fixed;

@@ -1,0 +1,16 @@
+{
+  "width": 2048,
+  "height": 917,
+  "horizon_y": 200,
+  "diver": {
+    "x": 1021,
+    "y": 311,
+    "r": 48
+  },
+  "planes": {
+    "sky": 1,
+    "diver": 2,
+    "bay": 3
+  },
+  "ink_scale": 3.2
+}

@@ -339,6 +339,24 @@
     });
   }
 
+  // The prefetch cache is frozen at first fetch, so a page edited on disk
+  // (local preview) would never be picked up while the tab stays open.
+  // Revalidate it in the background whenever the tab becomes visible again;
+  // swaps keep using the cached copy until the fresh one has landed.
+  function revalidatePages() {
+    PAGES.forEach(function (u) {
+      var p = norm(new URL(u, location.href).pathname);
+      fetch(u, { cache: "no-cache" })
+        .then(function (r) { return r.ok ? r.text() : Promise.reject(r.status); })
+        .then(function (t) { pageCache[p] = t; })
+        .catch(function () {});
+    });
+  }
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) revalidatePages();
+  });
+  window.addEventListener("focus", revalidatePages);
+
   function render(html) {
     var doc = new DOMParser().parseFromString(html, "text/html");
     document.title = doc.title;
