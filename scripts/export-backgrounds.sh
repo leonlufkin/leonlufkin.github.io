@@ -3,8 +3,8 @@
 # assets/backgrounds/ and regenerate assets/js/backgrounds.js (the manifest
 # used for random background sampling). Idempotent: already-exported images
 # are skipped, so rerun after adding/moving photos in backgrounds/.
-# Each manifest entry carries the image's average edge color, used to fill
-# window width beyond the photo.
+# Each manifest entry carries the exported image's dimensions for viewport
+# matching and its average edge color to fill space beyond the photo.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -22,6 +22,7 @@ mkdir -p assets/backgrounds/light assets/backgrounds/dark assets/backgrounds/wid
 for mode in light dark; do
   echo "  $mode: [" >> "$MANIFEST"
   for f in backgrounds/$mode/*; do
+    [ -e "$f" ] || continue
     case "$f" in *.md|*.txt) continue ;; esac
     base=$(basename "${f%.*}" | tr '[:upper:]' '[:lower:]' | sed 's/ü/ue/g;s/ä/ae/g;s/ö/oe/g')
     out="assets/backgrounds/$mode/$base.jpg"
@@ -33,6 +34,11 @@ for mode in light dark; do
     h=$(sips -g pixelHeight "$f" | tail -1 | awk '{print $2}')
     if [ $((w * 100 / h)) -gt 200 ]; then Z=3200; EDGES=rows; else Z=1600; EDGES=cols; fi
     [ -f "$out" ] || sips -Z $Z -s format jpeg -s formatOptions 60 "$f" --out "$out" >/dev/null
+    # Measure the served JPEG, not the original (which may have been resized
+    # or rotated during export). Selection uses these natural dimensions.
+    out_dims=$(sips -g pixelWidth -g pixelHeight "$out")
+    out_width=$(awk '/pixelWidth:/{print $2}' <<< "$out_dims")
+    out_height=$(awk '/pixelHeight:/{print $2}' <<< "$out_dims")
     # small thumbnail for the gallery view (lazy-loaded there)
     tout="assets/backgrounds/thumbs/$base.jpg"
     [ -f "$tout" ] || sips -Z 400 -s format jpeg -s formatOptions 60 "$out" --out "$tout" >/dev/null
@@ -46,33 +52,24 @@ for mode in light dark; do
       else {for(var y=0;y<H;y++)[0,1,2,W-3,W-2,W-1].forEach(function(x){px(x,y);});}
       "#"+[r,g,b].map(function(v){return ("0"+Math.round(v/n*255).toString(16)).slice(-2)}).join("");')
     # Manifest entry (named fields):
-    #   u url, c edge color, l location label,
-    #   w widened-variant url, s/y its alignment (size% / posY%)
-    entry="{\"u\": \"/assets/backgrounds/$mode/$base.jpg\", \"c\": \"$color\""
+    #   u url, c edge color, width/height exported dimensions, l location label,
+    #   edge side/cap palette is added by sample-background-colors.py below.
+    entry="{\"u\": \"/assets/backgrounds/$mode/$base.jpg\", \"c\": \"$color\", \"width\": $out_width, \"height\": $out_height"
     lbl=$(awk -F'\t' -v k="$base" '$1==k{print $2; exit}' backgrounds/labels.txt 2>/dev/null)
     [ -n "$lbl" ] && entry="$entry, \"l\": \"$lbl\""
-    # Optional AI-widened variant: backgrounds/widened/<same base name>.*
-    # Rendered UNDER the sharp original, so its low-res center stays hidden;
-    # it takes over where the original ends on wide windows.
-    wsrc=$(find backgrounds/widened -maxdepth 1 -name "$(basename "${f%.*}").[!a]*" 2>/dev/null | head -1)
-    if [ -n "$wsrc" ]; then
-      wout="assets/backgrounds/widened/$base.jpg"
-      [ -f "$wout" ] || sips -Z 4000 -s format jpeg -s formatOptions 60 "$wsrc" --out "$wout" >/dev/null
-      entry="$entry, \"w\": \"/assets/backgrounds/widened/$base.jpg\""
-      # Optional .align sidecar: "<size%> <posY%>" measured so the sharp
-      # original overlays its own region inside the widened image exactly
-      # (needed when the widened center is a crop band, not the full photo)
-      asrc="backgrounds/widened/$(basename "${f%.*}").align"
-      if [ -f "$asrc" ]; then
-        read -r A_S A_P < "$asrc"
-        entry="$entry, \"s\": $A_S, \"y\": $A_P"
-      fi
-    fi
     echo "    $entry}," >> "$MANIFEST"
   done
+  # Close the mode's array. An entry line ends with "},", so strip that comma
+  # when this mode had no entries; then always close on its own line.
+  last=$(tail -1 "$MANIFEST")
+  case "$last" in
+    *",") sed -i '' '$ s/,$//' "$MANIFEST" ;;
+  esac
   echo "  ]," >> "$MANIFEST"
 done
+# The final "]" before "}" must not carry a comma: drop it from the last line.
+sed -i '' '$ s/,$//' "$MANIFEST"
 echo "};" >> "$MANIFEST"
-
+uv run --with pillow python scripts/sample-background-colors.py
 echo "Exported: light=$(ls assets/backgrounds/light | wc -l | tr -d ' ') dark=$(ls assets/backgrounds/dark | wc -l | tr -d ' ')"
 echo "Total size: $(du -sh assets/backgrounds | cut -f1)"

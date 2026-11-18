@@ -88,14 +88,22 @@
     ["Round", "18px"],
   ];
 
-  // Background image row: built dynamically from the manifest (backgrounds.js)
-  // for the effective theme. Index 0 = whatever the random pick loaded.
+  // Use the same geometry-filtered pool as automatic background selection.
+  // Index 0 leaves photo selection to the site; saved selections use URLs,
+  // because a filtered list's indices change with the window's proportions.
   function bgList() {
     var mode = effectiveDark() ? "dark" : "light";
-    var pool = (window.BACKGROUNDS || {})[mode] || [];
+    var pool = window.SiteBackgrounds ? window.SiteBackgrounds.pool(mode) : [];
     return [["Random", null]].concat(pool.map(function (e) {
       return [e.u.split("/").pop().replace(/\.jpg$/, ""), e];
     }));
+  }
+
+  function imageIndex(list, url) {
+    for (var i = 1; i < list.length; i++) {
+      if (list[i][1].u === url) return i;
+    }
+    return 0;
   }
 
   var ROWS = [
@@ -116,11 +124,33 @@
   // Defaults mirror the styles baked into style.css (Georgia; hairline boxes
   // are baked in, so "Site default" applies no inline override).
   // Theme is handled by the site's real toggle (site.js), not the picker.
-  var DEFAULTS = { f: 0, z: 1, l: 0, k: 0, n: 0, o: 0, c: 0, i: 0, min: 0 };
+  var DEFAULTS = { f: 0, z: 1, l: 0, k: 0, n: 0, o: 0, c: 0, i: 0, b: 12, min: 0 };
   var s;
   // v5 key: ignore state saved before Line/Fill/Color became independent rows
   try { s = JSON.parse(localStorage.getItem("stylePreview-v9")) || {}; } catch (e) { s = {}; }
   for (var k in DEFAULTS) { if (typeof s[k] !== "number") s[k] = DEFAULTS[k]; }
+  s.b = Number.isFinite(s.b) ? Math.max(0, Math.min(40, s.b)) : 12;
+
+  // Resolve the old index in its ORIGINAL unfiltered list exactly once.
+  // An incompatible legacy choice is discarded, never reinterpreted as a
+  // different image at the same index in the newly filtered list.
+  if (!Object.prototype.hasOwnProperty.call(s, "imageUrl")) {
+    var oldPool = (window.BACKGROUNDS || {})[effectiveDark() ? "dark" : "light"] || [];
+    var oldPick = s.i > 0 && oldPool[s.i - 1];
+    s.imageUrl = oldPick ? oldPick.u : null;
+  }
+  if (typeof s.imageUrl !== "string") s.imageUrl = null;
+  var initialList = bgList();
+  var initialIndex = imageIndex(initialList, s.imageUrl);
+  if (!initialIndex) s.imageUrl = null;
+  if (initialIndex && window.SiteBackgrounds) {
+    var currentPick = window.SiteBackgrounds.current();
+    // A manual choice already made in this tab (including the gallery)
+    // takes precedence over an older preference saved by this panel.
+    if (!currentPick || !currentPick.manual) {
+      window.SiteBackgrounds.choose(initialList[initialIndex][1]);
+    }
+  }
 
   var css = document.createElement("style");
   css.textContent =
@@ -139,6 +169,11 @@
     "#style-switcher button{cursor:pointer;height:22px;min-width:22px;line-height:1;" +
     "border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--text)}" +
     "#style-switcher button:hover{border-color:var(--muted)}" +
+    "#style-switcher .photo-blend-control{display:grid;grid-template-columns:1fr auto;" +
+    "gap:3px 10px;min-width:220px;margin-top:7px}" +
+    "#style-switcher .photo-blend-control output{font-variant-numeric:tabular-nums;color:var(--muted)}" +
+    "#style-switcher .photo-blend-control input{grid-column:1/-1;width:100%;height:18px;" +
+    "margin:0;cursor:pointer;accent-color:var(--accent)}" +
     "#style-switcher.sw-min .row{display:none}" +
     "#style-switcher.sw-min{padding:6px 10px}" +
     "#style-switcher.sw-min .hd{margin:0}";
@@ -150,6 +185,11 @@
     '<div class="hd"><span>Style preview</span><span class="btns">' +
     '<button id="sw-reset" title="Back to defaults">reset</button>' +
     '<button id="sw-min" title="Collapse">&ndash;</button></span></div>';
+  html += '<div class="photo-blend-control">' +
+    '<label for="sw-photo-blend">Photo blend</label>' +
+    '<output id="sw-photo-blend-value" for="sw-photo-blend"></output>' +
+    '<input id="sw-photo-blend" type="range" min="0" max="40" step="1" ' +
+    'title="Increase to soften a wider strip where the photo meets the background."></div>';
   ROWS.forEach(function (r) {
     html +=
       '<div class="row"><span class="lab">' + r.label + "</span>" +
@@ -160,20 +200,21 @@
   panel.innerHTML = html;
   document.body.appendChild(panel);
 
+  function applyPhotoBlend() {
+    root.style.setProperty("--photo-blend-width", s.b + "%");
+    var dial = document.getElementById("sw-photo-blend");
+    dial.value = String(s.b);
+    dial.setAttribute("aria-valuetext", s.b === 0 ? "Sharp boundary" : s.b + "% blend width");
+    document.getElementById("sw-photo-blend-value").textContent = s.b + "%";
+  }
+  document.getElementById("sw-photo-blend").addEventListener("input", function (event) {
+    s.b = Math.max(0, Math.min(40, Number(event.target.value) || 0));
+    applyPhotoBlend();
+    try { localStorage.setItem("stylePreview-v9", JSON.stringify(s)); } catch (e) {}
+  });
+
   function target() {
     return document.querySelector(".intro") || document.querySelector("main");
-  }
-
-  function setLbl(text) {
-    var el = document.getElementById("bg-label");
-    if (!el) {
-      el = document.createElement("div");
-      el.id = "bg-label";
-      el.className = "bg-label";
-      document.body.appendChild(el);
-    }
-    el.textContent = text || "";
-    el.style.display = text ? "" : "none";
   }
 
   // Average the photo pixels behind the box, composite the wash over them,
@@ -187,25 +228,15 @@
     var r = t.getBoundingClientRect();
     var key = [url, Math.round(r.left), Math.round(r.top), Math.round(r.width),
                Math.round(r.height), innerWidth, innerHeight,
-               root.style.getPropertyValue("--bg-size"),
                cs.getPropertyValue("--wash")].join("|");
     if (key === lastSampleKey) return;
 
     var img = new Image();
     img.onload = function () {
-      var W = innerWidth, H = innerHeight, dispW, dispH, left, top;
-      var sizeOv = (root.style.getPropertyValue("--bg-size") || "").trim();
-      if (sizeOv) { // "auto S%" per-image alignment override
-        dispH = H * (parseFloat(sizeOv.replace(/[^\d.]/g, "")) || 100) / 100;
-        dispW = dispH * img.naturalWidth / img.naturalHeight;
-      } else { // contain
-        var sc = Math.min(W / img.naturalWidth, H / img.naturalHeight);
-        dispW = img.naturalWidth * sc; dispH = img.naturalHeight * sc;
-      }
-      left = (W - dispW) / 2;
-      var posOv = (root.style.getPropertyValue("--bg-pos") || "").trim();
-      top = posOv ? (H - dispH) * ((parseFloat(posOv.split(/\s+/).pop()) || 50) / 100)
-                  : (H - dispH) / 2;
+      var W = innerWidth, H = innerHeight;
+      var sc = Math.min(W / img.naturalWidth, H / img.naturalHeight);
+      var dispW = img.naturalWidth * sc, dispH = img.naturalHeight * sc;
+      var left = (W - dispW) / 2, top = (H - dispH) / 2;
 
       var x0 = Math.max(r.left, left), x1 = Math.min(r.right, left + dispW);
       var y0 = Math.max(r.top, top), y1 = Math.min(r.bottom, top + dispH);
@@ -256,26 +287,17 @@
   }
 
   function apply() {
+    applyPhotoBlend();
     document.body.style.fontFamily = FONTS[s.f][1];
     document.body.style.fontSize = SIZES[s.z];
 
     var bgs = bgList();
-    s.i = s.i % bgs.length;
-    if (s.i > 0) { // specific image chosen; index 0 leaves the random pick
-      var be = bgs[s.i][1];
-      root.style.setProperty("--bg-image", 'url("' + be.u + '")');
-      root.style.setProperty("--sky", be.c);
-      if (be.w) root.style.setProperty("--bg-wide", 'url("' + be.w + '")');
-      else root.style.removeProperty("--bg-wide");
-      if (be.w && be.s != null) {
-        root.style.setProperty("--bg-size", "auto " + be.s + "%");
-        root.style.setProperty("--bg-pos", "center " + be.y + "%");
-      } else {
-        root.style.removeProperty("--bg-size");
-        root.style.removeProperty("--bg-pos");
-      }
-      setLbl(be.l);
-    }
+    var current = window.SiteBackgrounds && window.SiteBackgrounds.current();
+    if (current && current.manual) s.imageUrl = current.u;
+    else if (current && current.u !== s.imageUrl) s.imageUrl = null;
+    s.i = imageIndex(bgs, s.imageUrl);
+    if (!s.i) s.imageUrl = null;
+    // Applying typography/fill settings must never replace a gallery choice.
 
     var t = target();
     if (t) {
@@ -325,31 +347,26 @@
     panel.classList.toggle("sw-min", !!s.min);
     document.getElementById("sw-min").innerHTML = s.min ? "+" : "&ndash;";
 
-    localStorage.setItem("stylePreview-v9", JSON.stringify(s));
+    try { localStorage.setItem("stylePreview-v9", JSON.stringify(s)); } catch (e) {}
   }
 
   panel.addEventListener("click", function (e) {
     var k = e.target.getAttribute && e.target.getAttribute("data-k");
     if (!k) return;
     var row = ROWS.filter(function (r) { return r.key === k; })[0];
+    if (!row) return;
+    if (k === "i") {
+      // Reconcile first if the gallery or a resize changed the current photo.
+      apply();
+    }
     var n = rowList(row).length;
     s[k] = (s[k] + n + +e.target.getAttribute("data-d")) % n;
-    if (k === "i" && s.i === 0) { // back to Random: roll a fresh one
-      var pool = bgList().slice(1);
-      if (pool.length) {
-        var pick = pool[Math.floor(Math.random() * pool.length)][1];
-        root.style.setProperty("--bg-image", 'url("' + pick.u + '")');
-        root.style.setProperty("--sky", pick.c);
-        if (pick.w) root.style.setProperty("--bg-wide", 'url("' + pick.w + '")');
-        else root.style.removeProperty("--bg-wide");
-        if (pick.w && pick.s != null) {
-          root.style.setProperty("--bg-size", "auto " + pick.s + "%");
-          root.style.setProperty("--bg-pos", "center " + pick.y + "%");
-        } else {
-          root.style.removeProperty("--bg-size");
-          root.style.removeProperty("--bg-pos");
-        }
-        setLbl(pick.l);
+    if (k === "i") {
+      var pick = bgList()[s.i][1];
+      s.imageUrl = pick ? pick.u : null;
+      if (window.SiteBackgrounds) {
+        if (pick) window.SiteBackgrounds.choose(pick);
+        else window.SiteBackgrounds.roll(true);
       }
     }
     apply();
@@ -367,6 +384,8 @@
   if (mqDark.addEventListener) mqDark.addEventListener("change", apply);
   window.addEventListener("themechange", apply); // real toggle (site.js) flipped
   window.addEventListener("pageswap", apply); // instant nav replaced <main>
+  window.addEventListener("backgroundgeometrychange", apply);
+  window.addEventListener("backgroundchange", apply);
 
   apply();
 })();

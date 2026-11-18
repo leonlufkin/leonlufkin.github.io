@@ -2,9 +2,9 @@
    Perf design:
    - A tiny inline bootstrap in each page's <head> applies the saved theme
      class and the session's background before first paint.
-   - The background is rolled ONCE per session (sessionStorage) and reused
-     across pages, so navigation never refetches an image. A new tab, a
-     theme flip, or a system-mode change rolls a fresh one.
+   - The background is reused across pages while it fits the viewport.
+     Photos are filtered by aspect ratio to minimize the margins.
+     Resizing only replaces a photo when it no longer fits the new shape.
    - All three pages are prefetched into memory at idle; clicking a site
      link swaps <header>/<main> in place — no document reload, no progress
      bar, no background repaint. Falls back to normal navigation on error.
@@ -31,8 +31,86 @@
     root.classList.toggle("light", t === "light");
   }
 
-  function pool() {
-    return (window.BACKGROUNDS || {})[isDark() ? "dark" : "light"] || [];
+  function viewportRatio() {
+    return Math.max(1, innerWidth) / Math.max(1, innerHeight);
+  }
+
+  // Always display the full original; edge colors extend into the margins.
+  function layout(e) {
+    var W = Math.max(1, innerWidth), H = Math.max(1, innerHeight);
+    var scale = Math.min(W / e.width, H / e.height);
+    var width = e.width * scale, height = e.height * scale;
+    return { width: width, height: height, left: (W - width) / 2, top: (H - height) / 2 };
+  }
+
+  function edgeColor(e) {
+    var axis = viewportRatio() >= e.width / e.height ? "sides" : "caps";
+    return e.edge && e.edge[axis] || e.c;
+  }
+
+  // With contain, this is the fraction of the viewport covered by the photo.
+  // Only keep the closest shapes, within two percentage points of the best.
+  function fitting(list) {
+    var ratio = viewportRatio();
+    var scored = list.filter(function (e) {
+      return Number.isFinite(e.width) && e.width > 0 &&
+        Number.isFinite(e.height) && e.height > 0;
+    }).map(function (e) {
+      var aspect = e.width / e.height;
+      return { entry: e, fit: Math.min(aspect / ratio, ratio / aspect) };
+    });
+    var best = scored.reduce(function (value, e) { return Math.max(value, e.fit); }, 0);
+    var cutoff = best - 0.02;
+    return scored.filter(function (e) { return e.fit >= cutoff; })
+      .map(function (e) { return e.entry; });
+  }
+
+  function all() {
+    var catalog = window.BACKGROUNDS || {};
+    return (catalog.light || []).concat(catalog.dark || []);
+  }
+
+  function device() {
+    var touchPhone = matchMedia("(pointer: coarse)").matches && Math.min(innerWidth, innerHeight) <= 620;
+    return innerWidth <= 620 || touchPhone ? "mobile" : "laptop";
+  }
+
+  var selectedSets = window.BACKGROUND_SELECTIONS || {
+    laptop: all().filter(function (e) { return e.width >= e.height; }).map(function (e) { return e.u; }),
+    mobile: all().filter(function (e) { return e.width < e.height; }).map(function (e) { return e.u; })
+  };
+  var previewPick = null;
+
+  function selections() {
+    return { laptop: selectedSets.laptop.slice(), mobile: selectedSets.mobile.slice() };
+  }
+
+  function galleryPool() {
+    var selected = selectedSets[device()];
+    return fitting(all().filter(function (e) { return selected.indexOf(e.u) !== -1; }));
+  }
+
+  function pool(mode) {
+    var candidates = galleryPool();
+    var themeEntries = (window.BACKGROUNDS || {})[mode || (isDark() ? "dark" : "light")] || [];
+    var themed = candidates.filter(function (e) {
+      return themeEntries.some(function (entry) { return entry.u === e.u; });
+    });
+    // Geometry and the owner's selections take priority over photo brightness.
+    return themed.length ? themed : candidates;
+  }
+
+  function setSelections(value) {
+    var known = all().map(function (e) { return e.u; });
+    var valid = ["laptop", "mobile"].every(function (key) {
+      return Array.isArray(value[key]) && value[key].length &&
+        value[key].every(function (u) { return known.indexOf(u) !== -1; });
+    });
+    if (!valid) throw new Error("Choose at least one known photo for Laptop and Mobile.");
+    selectedSets = { laptop: value.laptop.slice(), mobile: value.mobile.slice() };
+    previewPick = null;
+    roll(false);
+    window.dispatchEvent(new Event("backgroundselectionchange"));
   }
 
   function sessionPick() {
@@ -52,44 +130,140 @@
     el.style.display = text ? "" : "none";
   }
 
+  var rowRequest = 0, rowPhoto = null;
+  function validRows(rows) {
+    return rows && ["left", "right"].every(function (side) {
+      return typeof rows[side] === "string" && rows[side].indexOf("data:image/png;base64,") === 0;
+    });
+  }
+  function showRows(rows) {
+    ["left", "right"].forEach(function (side) {
+      root.style.setProperty("--bg-rows-" + side, 'url("' + rows[side] + '")');
+    });
+  }
+  function applyRows(p) {
+    var request = ++rowRequest;
+    var horizontal = viewportRatio() > p.width / p.height;
+    root.style.removeProperty("--bg-rows"); // discard the old shared-color profile
+    if (!horizontal || rowPhoto !== p.u) {
+      root.style.removeProperty("--bg-rows-left");
+      root.style.removeProperty("--bg-rows-right");
+    }
+    rowPhoto = horizontal ? p.u : null;
+    if (!horizontal || !window.BackgroundRows) return;
+    if (validRows(p.rows)) showRows(p.rows);
+    window.BackgroundRows.get(p.u).then(function (rows) {
+      // An earlier image load must never recolor a newer choice or rotation.
+      if (request !== rowRequest || !validRows(rows)) return;
+      showRows(rows);
+      p.rows = rows;
+      try { sessionStorage.setItem("bg", JSON.stringify(p)); } catch (e) {}
+    });
+  }
+
+  function applyExtension(p) {
+    var active = !!p.extension && viewportRatio() > p.width / p.height;
+    root.classList.toggle("has-extension", active);
+    if (!active) {
+      ["--bg-extension", "--extension-width", "--extension-height"]
+        .forEach(function (key) { root.style.removeProperty(key); });
+      return;
+    }
+    var layer = document.getElementById("bg-extension");
+    if (!layer) {
+      layer = document.createElement("div");
+      layer.id = "bg-extension";
+      layer.setAttribute("aria-hidden", "true");
+      document.body.appendChild(layer);
+    }
+    var height = layout(p).height;
+    root.style.setProperty("--bg-extension", 'url("' + p.extension.u + '")');
+    root.style.setProperty("--extension-width", height * p.extension.width / p.extension.height + "px");
+    root.style.setProperty("--extension-height", height + "px");
+  }
+
   function applyPick(p) {
     root.style.setProperty("--bg-image", 'url("' + p.u + '")');
     root.style.setProperty("--sky", p.c);
-    if (p.w) root.style.setProperty("--bg-wide", 'url("' + p.w + '")');
-    else root.style.removeProperty("--bg-wide");
-    // per-image alignment when the widened center is a crop band of the original
-    if (p.w && p.s != null) {
-      root.style.setProperty("--bg-size", "auto " + p.s + "%");
-      root.style.setProperty("--bg-pos", "center " + p.y + "%");
-    } else {
-      root.style.removeProperty("--bg-size");
-      root.style.removeProperty("--bg-pos");
-    }
-    setLabel(p.l);
+    var aspect = p.width / p.height, ratio = viewportRatio();
+    root.style.setProperty("--photo-ratio", String(aspect));
+    root.style.setProperty("--photo-inverse", String(1 / aspect));
+    var direction = Math.abs(ratio - aspect) < 0.000001 ? null : ratio > aspect ? "right" : "bottom";
+    root.style.setProperty("--photo-seam", direction
+      ? "linear-gradient(to " + direction + ", transparent, #000 var(--photo-feather), #000 calc(100% - var(--photo-feather)), transparent)"
+      : "none");
+    applyRows(p);
+    applyExtension(p);
+    // Clear overrides left by older sessions or the previous preview tool.
+    root.classList.remove("has-outpaint");
+    var oldLayer = document.getElementById("bg-outpaint");
+    if (oldLayer) oldLayer.remove();
+    ["--bg-wide", "--bg-size", "--bg-pos", "--bg-outpaint", "--bg-photo-width", "--bg-photo-height", "--bg-outpaint-width", "--bg-outpaint-height"]
+      .forEach(function (key) { root.style.removeProperty(key); });
+    setLabel((p.l || "") + (p.preview ? " · Preview" : ""));
+    window.dispatchEvent(new Event("backgroundchange"));
   }
 
-  // Reuse the session's background if it matches the current mode and still
-  // exists in the manifest; otherwise (or when forced) roll a new one.
-  function roll(force) {
-    var m = isDark() ? "d" : "l";
-    var p = sessionPick();
-    var list = pool();
-    var valid = p && p.m === m && list.some(function (e) { return e.u === p.u; });
-    if (valid && !force) { applyPick(p); return; }
-    if (!list.length) return; // no manifest: CSS fallback image stays
-    var e = list[Math.floor(Math.random() * list.length)];
-    p = { m: m, u: e.u, c: e.c };
-    if (e.l) p.l = e.l; // location label
-    if (e.w) p.w = e.w; // AI-widened variant for wide windows
-    if (e.s != null) { p.s = e.s; p.y = e.y; } // its alignment, if measured
+  function savePick(e, manual, preview) {
+    var p = { v: 3, m: isDark() ? "d" : "l", u: e.u, c: edgeColor(e), l: e.l,
+      width: e.width, height: e.height, viewport: viewportRatio(), device: device(),
+      manual: !!manual, preview: !!preview };
+    if (e.edge) p.edge = e.edge;
+    if (e.extension) p.extension = e.extension;
+    var previous = sessionPick();
+    if (previous && previous.u === e.u && validRows(previous.rows)) p.rows = previous.rows;
     try { sessionStorage.setItem("bg", JSON.stringify(p)); } catch (err) {}
     applyPick(p);
   }
+
+  function choose(entry) {
+    var e = galleryPool().find(function (candidate) { return candidate.u === entry.u; });
+    if (!e) return false;
+    previewPick = null;
+    savePick(e, true);
+    return true;
+  }
+
+  function preview(entry) {
+    var e = all().find(function (candidate) { return candidate.u === entry.u; });
+    if (!e) return false;
+    previewPick = e;
+    savePick(e, true, true);
+    return true;
+  }
+
+  // Refresh cached metadata from the manifest, and keep a manual gallery
+  // choice across navigation even when it belongs to the other theme.
+  function roll(force) {
+    if (force) previewPick = null;
+    if (previewPick) { savePick(previewPick, true, true); return; }
+    var m = isDark() ? "d" : "l";
+    var p = sessionPick();
+    var list = pool();
+    var candidates = p && p.manual ? galleryPool() : list;
+    var valid = p && !p.preview && p.m === m && candidates.find(function (e) { return e.u === p.u; });
+    if (valid && !force) { savePick(valid, p.manual); return; }
+    if (!list.length) return; // no manifest: CSS fallback image stays
+    var e = list[Math.floor(Math.random() * list.length)];
+    savePick(e, false);
+  }
+
+  // Shared by the gallery and the temporary style preview's image control.
+  window.SiteBackgrounds = { pool: pool, galleryPool: galleryPool, all: all,
+    choose: choose, preview: preview, roll: roll, current: sessionPick,
+    device: device, selections: selections, setSelections: setSelections, layout: layout };
 
   function announce() {
     try { window.dispatchEvent(new Event("themechange")); } catch (e) {}
   }
 
+  // A review link opens one photo without modifying either curated set.
+  var focusPhoto = /(?:^|[?&])photo=([a-z0-9_-]+)(?:&|$)/.exec(location.search || "");
+  if (focusPhoto) {
+    previewPick = all().find(function (e) {
+      return e.u.split("/").pop() === focusPhoto[1] + ".jpg";
+    }) || null;
+  }
   applyTheme();
   roll(false);
 
@@ -108,79 +282,20 @@
     label();
     announce();
   };
-  /* --- Photo gallery ------------------------------------------------------
-     A grid of every background (light + dark), opened from the nav. Uses the
-     small /thumbs/ images with lazy loading, so opening it costs only the
-     thumbnails actually scrolled into view. Tapping a photo makes it the
-     current background. */
-
-  var galleryBtn = document.createElement("button");
-  galleryBtn.className = "theme-toggle gallery-btn";
-  galleryBtn.textContent = "▦";
-  galleryBtn.setAttribute("aria-label", "Photo gallery");
-  var galleryEl = null;
-
-  function thumbUrl(u) {
-    return u.replace("/light/", "/thumbs/").replace("/dark/", "/thumbs/");
-  }
-
-  function buildGallery() {
-    galleryEl = document.createElement("div");
-    galleryEl.id = "gallery";
-    var close = document.createElement("button");
-    close.className = "gallery-close";
-    close.innerHTML = "&#10005;";
-    close.setAttribute("aria-label", "Close gallery");
-    close.onclick = function () { toggleGallery(false); };
-    var grid = document.createElement("div");
-    grid.className = "gallery-grid";
-    ["light", "dark"].forEach(function (mode) {
-      ((window.BACKGROUNDS || {})[mode] || []).forEach(function (e) {
-        var fig = document.createElement("figure");
-        var img = new Image();
-        img.loading = "lazy";
-        img.decoding = "async";
-        img.src = thumbUrl(e.u);
-        img.alt = e.l || "";
-        fig.appendChild(img);
-        if (e.l) {
-          var cap = document.createElement("figcaption");
-          cap.textContent = e.l;
-          fig.appendChild(cap);
-        }
-        fig.addEventListener("click", function () {
-          var p = { m: isDark() ? "d" : "l", u: e.u, c: e.c };
-          if (e.l) p.l = e.l;
-          if (e.w) p.w = e.w;
-          if (e.s != null) { p.s = e.s; p.y = e.y; }
-          try { sessionStorage.setItem("bg", JSON.stringify(p)); } catch (err) {}
-          applyPick(p);
-          toggleGallery(false);
-        });
-        grid.appendChild(fig);
-      });
-    });
-    galleryEl.appendChild(close);
-    galleryEl.appendChild(grid);
-    document.body.appendChild(galleryEl);
-  }
-
-  function toggleGallery(open) {
-    var want = open != null ? open : !root.classList.contains("gallery-open");
-    if (want && !galleryEl) buildGallery();
-    root.classList.toggle("gallery-open", want);
-  }
-
-  galleryBtn.onclick = function () { toggleGallery(); };
-  document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape") toggleGallery(false);
+  // Gallery UI and its independent Laptop/Mobile editor live in gallery.js.
+  var geometryTimer;
+  window.addEventListener("resize", function () {
+    clearTimeout(geometryTimer);
+    geometryTimer = setTimeout(function () {
+      roll(false);
+      window.dispatchEvent(new Event("backgroundgeometrychange"));
+    }, 200);
   });
 
   function mount() {
     var nav = document.querySelector("nav");
     if (nav) {
       nav.appendChild(b);
-      nav.appendChild(galleryBtn);
     }
   }
   label();

@@ -4,17 +4,50 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Leon Lufkin</title>
-  <meta name="description" content="Leon Lufkin — researcher at Zyphra working on new architectures for AI models.">
+  <meta name="description" content="Leon Lufkin — Ph.D. student in statistics at Stanford and an MTS at Zyphra, developing new architectures for language models.">
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="preload" href="assets/fonts/lmroman-regular.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="assets/css/style.css?v=33">
+  <link rel="stylesheet" href="assets/css/style.css?v=46">
+  <link rel="stylesheet" href="assets/css/gallery.css?v=1">
   <link rel="prefetch" href="research.html">
   <link rel="prefetch" href="cv.html">
-  <script>/* pre-paint bootstrap: saved theme + this session's background */
-(function(){var d=document.documentElement;try{var t=localStorage.getItem("theme");if(t)d.classList.add(t);var p=JSON.parse(sessionStorage.getItem("bg")||"null");var k=(t?t==="dark":matchMedia("(prefers-color-scheme: dark)").matches)?"d":"l";if(p&&p.m===k){d.style.setProperty("--bg-image",'url("'+p.u+'")');d.style.setProperty("--sky",p.c);if(p.w){d.style.setProperty("--bg-wide",'url("'+p.w+'")');if(p.s!=null){d.style.setProperty("--bg-size","auto "+p.s+"%");d.style.setProperty("--bg-pos","center "+p.y+"%");}}}}catch(e){}})();</script>
-  <script src="assets/js/backgrounds.js?v=12" defer></script>
+  <script>/* Restore a fitting session photo before paint; site.js checks the manifest. */
+(function () {
+  var root = document.documentElement;
+  try {
+    var theme = localStorage.getItem("theme");
+    if (theme) root.classList.add(theme);
+    var pick = JSON.parse(sessionStorage.getItem("bg") || "null");
+    var mode = (theme ? theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches) ? "d" : "l";
+    var ratio = Math.max(1, innerWidth) / Math.max(1, innerHeight);
+    if (pick && pick.v === 3 && !pick.preview && pick.m === mode && pick.viewport === ratio) {
+      root.style.setProperty("--bg-image", 'url("' + pick.u + '")');
+      root.style.setProperty("--sky", pick.c);
+      if (pick.width > 0 && pick.height > 0) {
+        var aspect = pick.width / pick.height;
+        root.style.setProperty("--photo-ratio", String(aspect));
+        root.style.setProperty("--photo-inverse", String(1 / aspect));
+        var direction = Math.abs(ratio - aspect) < 0.000001 ? null : ratio > aspect ? "right" : "bottom";
+        root.style.setProperty("--photo-seam", direction
+          ? "linear-gradient(to " + direction + ", transparent, #000 var(--photo-feather), #000 calc(100% - var(--photo-feather)), transparent)"
+          : "none");
+      }
+      if (ratio > pick.width / pick.height && pick.rows && ["left", "right"].every(function (side) {
+        return typeof pick.rows[side] === "string" && pick.rows[side].indexOf("data:image/png;base64,") === 0;
+      })) {
+        ["left", "right"].forEach(function (side) {
+          root.style.setProperty("--bg-rows-" + side, 'url("' + pick.rows[side] + '")');
+        });
+      }
+    }
+  } catch (e) {}
+})();</script>
+  <script src="assets/js/backgrounds.js?v=17" defer></script>
   <script src="assets/js/gate.js?v=1" defer></script>
-  <script src="assets/js/site.js?v=9" defer></script>
+  <script src="assets/js/background-selections.js?v=1" defer></script>
+  <script src="assets/js/background-rows.js?v=3" defer></script>
+  <script src="assets/js/site.js?v=18" defer></script>
+  <script src="assets/js/gallery.js?v=4" defer></script>
 </head>
 
 <body class="home">
@@ -22,8 +55,8 @@
     <section class="intro">
       <img class="headshot" src="assets/images/headshot-web.jpg" alt="Leon Lufkin" width="566" height="640">
       <p class="intro-name">Leon Lufkin</p>
-      <p>I am a researcher at Zyphra, where I develop new architectures for AI models.
-      I also work on problems in statistics and neuroscience.</p>
+      <p>I am a Ph.D. student in statistics at Stanford and an MTS at Zyphra.
+      I work on developing new architectures for language models.</p>
 
       <p>I studied statistics and math at Yale as an undergrad.
       I was fortunate to do research there, at Princeton, and at the Gatsby Unit (UCL).</p>
@@ -37,6 +70,6 @@
   </main>
 
   <!-- TEMPORARY font/border preview tool — remove when decided -->
-  <script src="assets/js/switcher.js?v=20" defer></script>
+  <script src="assets/js/switcher.js?v=25" defer></script>
 </body>
 </html>

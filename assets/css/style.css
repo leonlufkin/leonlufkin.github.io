@@ -45,6 +45,9 @@
 }
 
 :root {
+  /* --photo-seam is defined here by site.js, so its width dependency must
+     resolve here too, before the computed gradient is inherited by ::after. */
+  --photo-feather: var(--photo-blend-width, 12%);
   --bg: #ffffff;
   --text: #1a1a1a;
   --muted: #666666;
@@ -52,7 +55,9 @@
   --accent: #0645ad;
   --accent-soft: #dce6f5;
   --wash: rgba(255, 255, 255, 0.63);
-  --sky: #8aa3c9; /* sampled from the photo's own sky; fills width beyond the image */
+  --sky: #559bd1; /* sampled from the watercolor's own bay; fills width beyond the image */
+  --photo-ratio: 2.2326;
+  --photo-inverse: 0.4479;
 }
 
 /* Dark palette applies when forced via the toggle (html.dark), or — for the
@@ -91,31 +96,58 @@ html {
   display: none;
 }
 
-/* Background photo behind a translucent wash, fixed to the viewport.
-   Rule: a photo is never zoomed in. It renders whole at its natural aspect
-   (contain), centered. Under it, an optional AI-widened variant (--bg-wide)
-   extends the scene on wide windows — its low-res center stays hidden behind
-   the sharp original. Beyond both, the photo's own averaged edge color
-   (--sky, from the manifest) fills the rest. */
+/* Fill and photo share the same wash. Feather only the photo's boundary
+   into the fill; the central image remains sharp and at contain geometry. */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
-  z-index: -1;
+  z-index: -4;
+  pointer-events: none;
   background:
     linear-gradient(var(--wash), var(--wash)),
-    var(--bg-image, url("../images/background-web.jpg")) var(--bg-pos, center) / var(--bg-size, contain) no-repeat,
-    var(--bg-wide, none) center / auto 100% no-repeat var(--sky);
+    var(--bg-rows-left, none) left / 50% 100% no-repeat,
+    var(--bg-rows-right, none) right / 50% 100% no-repeat var(--sky);
 }
 
-/* Squarish/tall windows: the original may fit by width there, which would
-   misalign the height-fitted widened layer — drop it and keep the plain fill */
-@media (max-aspect-ratio: 4/3) {
-  body::before {
-    background:
-      linear-gradient(var(--wash), var(--wash)),
-      var(--bg-image, url("../images/background-web.jpg")) center / contain no-repeat var(--sky);
-  }
+body::after {
+  content: "";
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(100vw, calc(100vh * var(--photo-ratio, 0.75)));
+  height: min(100vh, calc(100vw * var(--photo-inverse, 1.3333333333333333)));
+  width: min(100vw, calc(100dvh * var(--photo-ratio, 0.75)));
+  height: min(100dvh, calc(100vw * var(--photo-inverse, 1.3333333333333333)));
+  z-index: -2;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--wash), var(--wash)),
+    var(--bg-image, url("../images/background-web.jpg")) center / contain no-repeat;
+  -webkit-mask-image: var(--photo-seam, none);
+  mask-image: var(--photo-seam, none);
+}
+
+/* Quiet generated surroundings stay behind the sharp original photograph.
+   Blur is applied to this layer itself, as well as feathering the photo seam. */
+#bg-extension { display: none; }
+.has-extension #bg-extension {
+  display: block;
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: var(--extension-width);
+  height: var(--extension-height);
+  z-index: -3;
+  pointer-events: none;
+  background: linear-gradient(var(--wash), var(--wash)),
+    var(--bg-extension) center / 100% 100% no-repeat;
+  filter: blur(8px);
+  mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent),
+    linear-gradient(to bottom, transparent, #000 3%, #000 97%, transparent);
+  mask-composite: intersect;
 }
 
 body {
@@ -147,82 +179,6 @@ a {
 a:hover {
   text-decoration: underline;
   text-underline-offset: 3px;
-}
-
-/* Photo gallery (opened from the nav ▦) ---------------------------------- */
-
-#gallery {
-  position: fixed;
-  inset: 0;
-  z-index: 5;
-  display: none;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  background: var(--bg);
-  padding: 4rem 1.25rem 2.5rem;
-}
-
-:root.gallery-open #gallery {
-  display: block;
-}
-
-:root.gallery-open body {
-  overflow: hidden; /* lock page scroll behind the gallery */
-}
-
-.gallery-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 1rem 0.9rem;
-  max-width: 64rem;
-  margin: 0 auto;
-}
-
-.gallery-grid figure {
-  margin: 0;
-  cursor: pointer;
-}
-
-.gallery-grid img {
-  display: block;
-  width: 100%;
-  height: 110px;
-  object-fit: cover;
-  border: 1px solid var(--line);
-}
-
-.gallery-grid figcaption {
-  margin-top: 0.3rem;
-  color: var(--muted);
-  font-size: 0.72rem;
-  font-style: italic;
-}
-
-.gallery-close {
-  position: fixed;
-  top: 12px;
-  right: 14px;
-  z-index: 6;
-  width: 40px;
-  height: 40px;
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--text);
-  font-family: inherit;
-  font-size: 1.15rem;
-  line-height: 1;
-  cursor: pointer;
-}
-
-@media (max-width: 620px) {
-  .gallery-grid {
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  }
-
-  .gallery-grid img {
-    height: 90px;
-  }
 }
 
 /* Faint location label for the background photo, bottom-left ------------- */
@@ -590,6 +546,8 @@ body.home main {
 
   /* strip everything that isn't the CV text */
   body::before,
+  body::after,
+  #bg-extension,
   main::before,
   header,
   nav,

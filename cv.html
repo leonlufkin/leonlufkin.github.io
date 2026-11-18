@@ -7,14 +7,47 @@
   <meta name="description" content="Curriculum vitae of Leon Lufkin.">
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="preload" href="assets/fonts/lmroman-regular.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="assets/css/style.css?v=33">
+  <link rel="stylesheet" href="assets/css/style.css?v=46">
+  <link rel="stylesheet" href="assets/css/gallery.css?v=1">
   <link rel="prefetch" href="index.html">
   <link rel="prefetch" href="research.html">
-  <script>/* pre-paint bootstrap: saved theme + this session's background */
-(function(){var d=document.documentElement;try{var t=localStorage.getItem("theme");if(t)d.classList.add(t);var p=JSON.parse(sessionStorage.getItem("bg")||"null");var k=(t?t==="dark":matchMedia("(prefers-color-scheme: dark)").matches)?"d":"l";if(p&&p.m===k){d.style.setProperty("--bg-image",'url("'+p.u+'")');d.style.setProperty("--sky",p.c);if(p.w){d.style.setProperty("--bg-wide",'url("'+p.w+'")');if(p.s!=null){d.style.setProperty("--bg-size","auto "+p.s+"%");d.style.setProperty("--bg-pos","center "+p.y+"%");}}}}catch(e){}})();</script>
-  <script src="assets/js/backgrounds.js?v=12" defer></script>
+  <script>/* Restore a fitting session photo before paint; site.js checks the manifest. */
+(function () {
+  var root = document.documentElement;
+  try {
+    var theme = localStorage.getItem("theme");
+    if (theme) root.classList.add(theme);
+    var pick = JSON.parse(sessionStorage.getItem("bg") || "null");
+    var mode = (theme ? theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches) ? "d" : "l";
+    var ratio = Math.max(1, innerWidth) / Math.max(1, innerHeight);
+    if (pick && pick.v === 3 && !pick.preview && pick.m === mode && pick.viewport === ratio) {
+      root.style.setProperty("--bg-image", 'url("' + pick.u + '")');
+      root.style.setProperty("--sky", pick.c);
+      if (pick.width > 0 && pick.height > 0) {
+        var aspect = pick.width / pick.height;
+        root.style.setProperty("--photo-ratio", String(aspect));
+        root.style.setProperty("--photo-inverse", String(1 / aspect));
+        var direction = Math.abs(ratio - aspect) < 0.000001 ? null : ratio > aspect ? "right" : "bottom";
+        root.style.setProperty("--photo-seam", direction
+          ? "linear-gradient(to " + direction + ", transparent, #000 var(--photo-feather), #000 calc(100% - var(--photo-feather)), transparent)"
+          : "none");
+      }
+      if (ratio > pick.width / pick.height && pick.rows && ["left", "right"].every(function (side) {
+        return typeof pick.rows[side] === "string" && pick.rows[side].indexOf("data:image/png;base64,") === 0;
+      })) {
+        ["left", "right"].forEach(function (side) {
+          root.style.setProperty("--bg-rows-" + side, 'url("' + pick.rows[side] + '")');
+        });
+      }
+    }
+  } catch (e) {}
+})();</script>
+  <script src="assets/js/backgrounds.js?v=17" defer></script>
   <script src="assets/js/gate.js?v=1" defer></script>
-  <script src="assets/js/site.js?v=9" defer></script>
+  <script src="assets/js/background-selections.js?v=1" defer></script>
+  <script src="assets/js/background-rows.js?v=3" defer></script>
+  <script src="assets/js/site.js?v=18" defer></script>
+  <script src="assets/js/gallery.js?v=4" defer></script>
 </head>
 
 <body>
@@ -29,29 +62,33 @@
   <main>
     <div class="cv-printhead print-only">
       <h1>Leon Lufkin</h1>
-      <p>leonlufkin [at] gmail [dot] com &middot; leonlufkin.github.io</p>
+      <p>lufkin@stanford.edu, leon@zyphra.com &middot; leonlufkin.github.io</p>
     </div>
     <h1 class="screen-only">Curriculum Vitae</h1>
-    <p class="cv-contact screen-only">leonlufkin [at] gmail [dot] com &middot; <a href="assets/cv.pdf" class="pdf-link">PDF</a></p>
+    <p class="cv-contact screen-only"><a href="mailto:lufkin@stanford.edu">lufkin@stanford.edu</a> &middot; <a href="mailto:leon@zyphra.com">leon@zyphra.com</a> &middot; <a href="assets/cv.pdf" class="pdf-link">PDF</a></p>
 
     <h2>Education</h2>
     <div class="cv-item">
       <div class="cv-main">
+        <p class="cv-title">Stanford University</p>
+        <p class="cv-sub">Ph.D. in Statistics</p>
+      </div>
+      <span class="cv-date">9/2026 – Present</span>
+    </div>
+    <div class="cv-item">
+      <div class="cv-main">
         <p class="cv-title">Yale University</p>
-        <p class="cv-sub">B.S. in Statistics &amp; Data Science, Mathematics</p>
+        <p class="cv-sub">B.S. in Statistics &amp; Data Science, Mathematics, <em>summa cum laude</em></p>
       </div>
-      <div class="cv-right">
-        <span class="cv-date">8/2020 – 12/2024</span>
-        <span class="cv-sub">GPA 3.99/4.00</span>
-      </div>
+      <span class="cv-date">8/2020 – 12/2024</span>
     </div>
 
     <h2>Work Experience</h2>
     <div class="cv-item">
       <div class="cv-main">
         <p class="cv-title">Zyphra</p>
-        <p class="cv-sub cv-sup">Intern, then Research Scientist</p>
-        <p class="cv-sub">Developing new architectures for AI models.</p>
+        <p class="cv-sub cv-sup">Research Scientist</p>
+        <p class="cv-sub">Developing new language model architectures.</p>
       </div>
       <span class="cv-date">1/2025 – Present</span>
     </div>
@@ -107,47 +144,57 @@
       <span class="cv-date">5/2018 – 1/2021</span>
     </div>
 
-    <h2>Research Interests</h2>
-    <p class="cv-prose">Machine learning theory, Computational neuroscience, High-dimensional statistics</p>
+    <div class="print-only">
+      <h2>Research Interests</h2>
+      <p class="cv-prose">Machine learning theory, Computational neuroscience, High-dimensional statistics, Large Language Models</p>
+    </div>
 
     <h2>Publications</h2>
     <ul class="cv-list">
       <li>
-        <span><span class="me">Leon Lufkin</span>, Tomás Figliolia, Beren Millidge, Kamesh Krishnamurthy. &ldquo;Hybrid associative memories.&rdquo; arXiv:2603.22325.</span>
+        <span><span class="me">Leon Lufkin</span>, Cutter Dawes, Alexander Speicher, Kamesh Krishnamurthy, Tomás Figliolia, Beren Millidge. &ldquo;<a href="https://arxiv.org/abs/2610.42112">Subquadratic attention with a hierarchical tree-structured indexer</a>.&rdquo; Technical Report, arXiv:2610.42112.</span>
+        <span class="cv-date">10/2026</span>
+      </li>
+      <li>
+        <span><span class="me">Leon Lufkin</span>, Tomás Figliolia, Beren Millidge, Kamesh Krishnamurthy. &ldquo;<a href="https://arxiv.org/abs/2603.22325">Hybrid associative memories</a>.&rdquo; Technical Report, arXiv:2603.22325.</span>
         <span class="cv-date">3/2026</span>
       </li>
       <li>
-        <span><span class="me">Leon Lufkin</span>, Andrew Saxe, Erin Grant. &ldquo;Nonlinear dynamics of localization in neural receptive fields.&rdquo; <em>NeurIPS</em>, spotlight presentation (&lt;4%).</span>
+        <span><span class="me">Leon Lufkin</span>, Andrew Saxe, Erin Grant. &ldquo;<a href="https://proceedings.neurips.cc/paper_files/paper/2024/hash/2dab2f94544f9297d01a46a5453b93cd-Abstract-Conference.html">Nonlinear dynamics of localization in neural receptive fields</a>.&rdquo; <em>NeurIPS</em>, spotlight presentation (&lt;4%).</span>
         <span class="cv-date">5/2024</span>
       </li>
       <li>
-        <span><span class="me">Leon Lufkin</span>, Yihong Wu, Jiaming Xu. &ldquo;Sharp information-theoretic thresholds for shuffled linear regression.&rdquo; <em>ISIT</em>.</span>
+        <span><span class="me">Leon Lufkin</span>, Yihong Wu, Jiaming Xu. &ldquo;<a href="https://arxiv.org/abs/2402.09693">Sharp information-theoretic thresholds for shuffled linear regression</a>.&rdquo; <em>ISIT</em>.</span>
         <span class="cv-date">2/2024</span>
       </li>
       <li>
-        <span>Raghavendra Pothukuchi, <span class="me">Leon Lufkin</span>, Jonathan Cohen, Abhishek Bhattacharjee. &ldquo;The QUATRO application suite: quantum computing for models of human cognition.&rdquo; arXiv preprint.</span>
+        <span>Raghavendra Pothukuchi, <span class="me">Leon Lufkin</span>, Jonathan Cohen, Abhishek Bhattacharjee. &ldquo;<a href="https://arxiv.org/abs/2309.00597">The QUATRO application suite: quantum computing for models of human cognition</a>.&rdquo; arXiv preprint.</span>
         <span class="cv-date">9/2023</span>
       </li>
       <li>
-        <span>Grayden Shand, Daniel T. Fuller, <span class="me">Leon Lufkin</span>, Carly Lovelett, Nabendu Pal, Sumona Mondal, Shantanu Sur. &ldquo;A stronger association of depression with rheumatoid arthritis in presence of obesity and hypertriglyceridemia.&rdquo; <em>Frontiers in Epidemiology</em>.</span>
+        <span>Grayden Shand, Daniel T. Fuller, <span class="me">Leon Lufkin</span>, Carly Lovelett, Nabendu Pal, Sumona Mondal, Shantanu Sur. &ldquo;<a href="https://www.frontiersin.org/journals/epidemiology/articles/10.3389/fepid.2023.1216497/full">A stronger association of depression with rheumatoid arthritis in presence of obesity and hypertriglyceridemia</a>.&rdquo; <em>Frontiers in Epidemiology</em>.</span>
         <span class="cv-date">9/2023</span>
       </li>
       <li>
-        <span><span class="me">Leon Lufkin</span>, Ankita Samanta, Petra Kraus. &ldquo;Glis1 and oxaloacetate in nucleus pulposus stromal cell somatic reprogramming and survival.&rdquo; <em>Frontiers in Molecular Biosciences</em>.</span>
+        <span><span class="me">Leon Lufkin</span>, Ankita Samanta, Petra Kraus. &ldquo;<a href="https://www.frontiersin.org/journals/molecular-biosciences/articles/10.3389/fmolb.2022.1009402/full">Glis1 and oxaloacetate in nucleus pulposus stromal cell somatic reprogramming and survival</a>.&rdquo; <em>Frontiers in Molecular Biosciences</em>.</span>
         <span class="cv-date">11/2022</span>
       </li>
       <li>
-        <span><span class="me">Leon Lufkin</span>, Ashish Puri, Ganlin Song, Xinyi Zhong, John Lafferty. &ldquo;Emergent organization of receptive fields in networks of excitatory and inhibitory neurons.&rdquo; arXiv:2205.13614.</span>
+        <span><span class="me">Leon Lufkin</span>, Ashish Puri, Ganlin Song, Xinyi Zhong, John Lafferty. &ldquo;<a href="https://arxiv.org/abs/2205.13614">Emergent organization of receptive fields in networks of excitatory and inhibitory neurons</a>.&rdquo; arXiv:2205.13614.</span>
         <span class="cv-date">5/2022</span>
       </li>
       <li>
-        <span><span class="me">Leon Lufkin</span>, Marko Budišić, Sumona Mondal, Shantanu Sur. &ldquo;A Bayesian model to analyze the association of rheumatoid arthritis with risk factors and their interactions.&rdquo; <em>Frontiers in Public Health</em>.</span>
+        <span><span class="me">Leon Lufkin</span>, Marko Budišić, Sumona Mondal, Shantanu Sur. &ldquo;<a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8415718/">A Bayesian model to analyze the association of rheumatoid arthritis with risk factors and their interactions</a>.&rdquo; <em>Frontiers in Public Health</em>.</span>
         <span class="cv-date">7/2021</span>
       </li>
     </ul>
 
     <h2>Academic Honors &amp; Awards</h2>
     <ul class="cv-list">
+      <li>
+        <span>National Science Foundation Graduate Research Fellowship (NSF GRFP)</span>
+        <span class="cv-date">4/2025</span>
+      </li>
       <li>
         <span>Hartigan Prize for outstanding original research in statistics, Yale University</span>
         <span class="cv-date">5/2024</span>
@@ -166,6 +213,7 @@
       </li>
     </ul>
 
+    <div class="print-only">
     <h2>Talks &amp; Presentations</h2>
     <ul class="cv-list">
       <li>
@@ -224,15 +272,17 @@
       </li>
     </ul>
 
+    </div>
+
     <h2>Fun</h2>
     <ul class="cv-list">
-      <li><span>Activities: Swimming (competitive), cycling, snowboarding, pickleball, electric guitar, archery</span></li>
-      <li><span>Travel: Visited 41 countries across 6 continents; lived in Singapore for 9 years</span></li>
+      <li><span>Activities: Cycling, Skydiving, Competitive swimming, Snowboarding, Pickleball, Guitar, Archery</span></li>
+      <li><span>Travel: Visited 41 countries across 6 continents, lived in Singapore for 9 years</span></li>
       <li><span>Languages: English, German</span></li>
     </ul>
   </main>
 
   <!-- TEMPORARY font/border preview tool — remove when decided -->
-  <script src="assets/js/switcher.js?v=20" defer></script>
+  <script src="assets/js/switcher.js?v=25" defer></script>
 </body>
 </html>

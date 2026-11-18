@@ -44,3 +44,4 @@ vakaruhfahli	Vakarufalhi
 windhoek_field	Near Windhoek
 yosemite_valley	Yosemite Valley
 yosemite_valley2	Yosemite Valley
+monterey_bay_watercolor	Monterey Bay
