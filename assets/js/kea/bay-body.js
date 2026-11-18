@@ -39,7 +39,15 @@ window.mountBayBody = function mountBayBody(container, {
 
     void main() {
         vec2 uv = gl_FragCoord.xy / uRes;
-        vec2 tcoord = vec2(uv.x, 1.0 - uv.y);   // painting px, y down (matches the bake)
+        // The painting is fitted so its top edge sits at the window top and
+        // its bottom edge at the window bottom (cover on the short axis):
+        // above the painting, the sky's top row extends; below it, the bay's
+        // bottom row does. uPaintFit carries the contained rect (x, y, w, h)
+        // in window px; sampling clamps into it, so the fills are the
+        // painting's own colours and the diver stays mid-window.
+        vec2 px = uv * uRes;
+        vec2 rel = (px - uPaintFit.xy) / uPaintFit.zw;
+        vec2 tcoord = clamp(rel, 0.0, 1.0);
         vec4 m = texture2D(uMask, tcoord);
         float plane = m.r * 255.0;
         float ink = m.g;
@@ -118,6 +126,16 @@ window.mountBayBody = function mountBayBody(container, {
         .catch(e => { onFail && onFail(String(e)); return null; });
 
     let raf = 0, t0 = 0;
+    // The painting at 2048x917 sits in the window at "cover" scale, anchored
+    // so its top edge is the window top and its bottom edge the window bottom;
+    // the shader clamps samples into this rect, extending sky upward and bay
+    // downward with the painting's own colours.
+    const PAINT_W = 2048, PAINT_H = 917;
+    function fitRect(w, h) {
+        const scale = Math.max(w / PAINT_W, h / PAINT_H);
+        const pw = PAINT_W * scale, ph = PAINT_H * scale;
+        return { x: (w - pw) / 2, y: (h - ph) / 2, w: pw, h: ph };
+    }
     function draw(now) {
         const dpr = Math.min(2, window.devicePixelRatio || 1);
         const w = Math.round(canvas.clientWidth * dpr), h = Math.round(canvas.clientHeight * dpr);
@@ -125,6 +143,8 @@ window.mountBayBody = function mountBayBody(container, {
         if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
         gl.viewport(0, 0, w, h);
         gl.uniform2f(U('uRes'), w, h);
+        const f = fitRect(w, h);
+        gl.uniform4f(U('uPaintFit'), f.x, f.y, f.w, f.h);
         gl.uniform1f(U('uT'), (now - t0) / 1000);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
         raf = requestAnimationFrame(draw);

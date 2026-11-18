@@ -9,16 +9,6 @@
   stage.id = 'bay-stage';
   stage.setAttribute('aria-hidden', 'true');
 
-  function letterbox(canvas) {
-    canvas.style.position = 'absolute';
-    canvas.style.left = '50%';
-    canvas.style.top = '50%';
-    canvas.style.transform = 'translate(-50%, -50%)';
-    // contain geometry, matching body::after's photo sizing
-    canvas.style.width = 'min(100vw, calc(100vh * 2048 / 917))';
-    canvas.style.height = 'min(100vh, calc(100vw * 917 / 2048))';
-  }
-
   function mount() {
     var opts = {
       planes: '/assets/images/kea/bay-planes.png',
@@ -28,15 +18,23 @@
     };
     var body = mountBayBody(stage, opts);
     var dive = mountBayDive(stage, opts);
-    letterbox(body.canvas);
-    letterbox(dive.canvas);
+    // canvas sizing lives in the stylesheet (#bay-stage canvas fills the
+    // window); the shaders fit the painting inside (top edge = window top,
+    // bottom edge = window bottom, colours extended beyond)
     stage.appendChild(body.canvas);
     stage.appendChild(dive.canvas);
     document.body.appendChild(stage);
-    document.documentElement.classList.add('has-bay');
-    Promise.all([body.ready, dive.ready]).catch(function () {
+    // Hide the static photo only once both live layers have actually painted:
+    // has-bay before that would flash the page background instead.
+    Promise.all([body.ready, dive.ready]).then(function () {
+      // two frames out: both raf loops have composed at least one frame
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          document.documentElement.classList.add('has-bay');
+        });
+      });
+    }).catch(function () {
       // either layer failed: fall back to the static photo
-      document.documentElement.classList.remove('has-bay');
       stage.remove();
     });
   }

@@ -18,6 +18,7 @@ window.mountBayDive = function mountBayDive(container, {
 
     const fs = `precision highp float;
     uniform vec2 uRes, uPaintSize;
+    uniform vec4 uPaintFit;  // contained painting rect in window px
     uniform float uT;
     uniform vec2 uPitch;     // tilt as (cos, sin) of the fall-line angle
     uniform float uSpeed;    // 0 at rest -> 1 flat-spinning
@@ -36,7 +37,12 @@ window.mountBayDive = function mountBayDive(container, {
 
     void main() {
         vec2 uv = gl_FragCoord.xy / uRes;
-        vec2 tcoord = vec2(uv.x, 1.0 - uv.y);           // painting px, y down
+        // Same fit as bay-body.js: the painting covers the window, its top
+        // edge at the window top and bottom edge at the window bottom. The
+        // diver cutout lands where the painting's diver sits, mid-window.
+        vec2 px = uv * uRes;
+        vec2 rel = (px - uPaintFit.xy) / uPaintFit.zw;
+        vec2 tcoord = clamp(rel, 0.0, 1.0);              // painting px, y down
         vec2 pc = tcoord * uPaintSize;
         vec2 d = pc - uDiver;
 
@@ -135,6 +141,15 @@ window.mountBayDive = function mountBayDive(container, {
         // keep drawing while visible: the canvas composites over the wash layer
         raf = document.hidden ? 0 : requestAnimationFrame(tick);
     }
+    // The painting's contained rect in the window — must match bay-body.js
+    // exactly so both layers' mappings agree (top edge at window top, bottom
+    // at window bottom, centred on x).
+    const PAINT_W = 2048, PAINT_H = 917;
+    function fitRect(w, h) {
+        const scale = Math.max(w / PAINT_W, h / PAINT_H);
+        const pw = PAINT_W * scale, ph = PAINT_H * scale;
+        return { x: (w - pw) / 2, y: (h - ph) / 2, w: pw, h: ph };
+    }
     function draw(now) {
         const dpr = Math.min(2, window.devicePixelRatio || 1);
         const w = Math.round(canvas.clientWidth * dpr), h = Math.round(canvas.clientHeight * dpr);
@@ -144,6 +159,8 @@ window.mountBayDive = function mountBayDive(container, {
         gl.clearColor(0, 0, 0, 0);
         gl.clear(gl.COLOR_BUFFER_BIT);
         gl.uniform2f(U('uRes'), w, h);
+        const f = fitRect(w, h);
+        gl.uniform4f(U('uPaintFit'), f.x, f.y, f.w, f.h);
         gl.uniform1f(U('uT'), now / 1000);
         gl.uniform2f(U('uPitch'), Math.cos(pitch.value), Math.sin(pitch.value));
         gl.uniform1f(U('uSpeed'), Math.max(0, Math.min(1, speed.value)));
