@@ -160,6 +160,8 @@ window.mountBayBody = function mountBayBody(container, {
     }
     function wake() { if (!raf) { t0 = performance.now() - (t0 || 0); raf = requestAnimationFrame(draw); } }
     document.addEventListener('visibilitychange', () => { if (!document.hidden) wake(); });
+    canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); raf = 0; }, false);
+    canvas.addEventListener('webglcontextrestored', () => { location.reload(); }, false);
     wake();
 
     return { canvas, ready, wake, draw };

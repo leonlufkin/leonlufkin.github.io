@@ -180,6 +180,8 @@ window.mountBayDive = function mountBayDive(container, {
         wake();
     }, { passive: true });
     document.addEventListener('visibilitychange', () => { if (!document.hidden) wake(); });
+    canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); raf = 0; }, false);
+    canvas.addEventListener('webglcontextrestored', () => { location.reload(); }, false);
 
     const load = src => new Promise((ok, fail) => { const i = new Image(); i.onload = () => ok(i); i.onerror = fail; i.src = src; });
     const loaded = Promise.all([fetch(metaUrl).then(r => r.json()), load(planes), load(mask)])
