@@ -5,15 +5,19 @@
 (function () {
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
-  var stage = document.createElement('div');
-  stage.id = 'bay-stage';
-  stage.setAttribute('aria-hidden', 'true');
+  // Bump ASSET_V whenever tools/bake-bay.py rewrites the textures/metadata:
+  // the browser otherwise serves the stale cached bake for the bare URLs.
+  var ASSET_V = '2';
 
   function mount() {
+    var stage = document.createElement('div');
+    stage.id = 'bay-stage';
+    stage.setAttribute('aria-hidden', 'true');
+    var ASSET_V = '7';
     var opts = {
-      planes: '/assets/images/kea/bay-planes.png',
-      mask: '/assets/images/kea/bay-mask.png',
-      meta: '/assets/images/kea/bay.json',
+      planes: '/assets/images/kea/bay-planes.png?v=' + ASSET_V,
+      mask: '/assets/images/kea/bay-mask.png?v=' + ASSET_V,
+      meta: '/assets/images/kea/bay.json?v=' + ASSET_V,
       onFail: function () { stage.remove(); }
     };
     var body = mountBayBody(stage, opts);
@@ -26,22 +30,33 @@
     document.body.appendChild(stage);
     // Hide the static photo only once both live layers have actually painted:
     // has-bay before that would flash the page background instead.
-    Promise.all([body.ready, dive.ready]).then(function () {
-      // two frames out: both raf loops have composed at least one frame
-      requestAnimationFrame(function () {
+    return Promise.all([body.ready, dive.ready]).then(function () {
+      return new Promise(function (resolve) {
+        // two frames out: both raf loops have composed at least one frame
         requestAnimationFrame(function () {
-          document.documentElement.classList.add('has-bay');
+          requestAnimationFrame(resolve);
         });
       });
-    }).catch(function () {
-      // either layer failed: fall back to the static photo
+    }).then(function () {
+      document.documentElement.classList.add('has-bay');
+    }).catch(function (e) {
+      console.error('bay mount failed:', e && e.message || e);
       stage.remove();
+      throw e;
+    });
+  }
+
+  function start(attempt) {
+    mount().catch(function () {
+      // transient load failures happen (six parallel fetches on a cold cache);
+      // one retry before falling back to the static photo
+      if (attempt < 1) setTimeout(function () { start(attempt + 1); }, 800);
     });
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', mount);
+    document.addEventListener('DOMContentLoaded', function () { start(0); });
   } else {
-    mount();
+    start(0);
   }
 })();

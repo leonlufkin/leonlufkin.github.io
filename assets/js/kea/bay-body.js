@@ -18,7 +18,8 @@ window.mountBayBody = function mountBayBody(container, {
 
     const fs = `precision highp float;
     uniform vec2 uRes;
-    uniform float uT;              // seconds, for the wash drift
+    uniform vec2 uPaintSize;      // the painting's dimensions, px
+    uniform float uT;             // seconds, for the wash drift
     uniform sampler2D uPaint, uMask;
 
 
@@ -38,16 +39,14 @@ window.mountBayBody = function mountBayBody(container, {
     }
 
     void main() {
-        vec2 uv = gl_FragCoord.xy / uRes;
-        // The painting is fitted so its top edge sits at the window top and
-        // its bottom edge at the window bottom (cover on the short axis):
-        // above the painting, the sky's top row extends; below it, the bay's
-        // bottom row does. uPaintFit carries the contained rect (x, y, w, h)
-        // in window px; sampling clamps into it, so the fills are the
-        // painting's own colours and the diver stays mid-window.
-        vec2 px = uv * uRes;
-        vec2 rel = (px - uPaintFit.xy) / uPaintFit.zw;
-        vec2 tcoord = clamp(rel, 0.0, 1.0);
+        vec2 uv = gl_FragCoord.xy / uRes;          // uv.y = 0 at BOTTOM
+        // The window splits into a sky band (top) and a bay band (bottom).
+        // Each painting band is stretched to fill its window band vertically;
+        // x stays uniform (width-fit), so nothing stretches horizontally.
+        // Contain the painting at width-fit scale, centred vertically; its
+        // top row extends upward as sky, its bottom row downward as ocean.
+        float top = (uRes.y - uPaintSize.y * (uRes.x / uPaintSize.x)) * 0.5;
+        vec2 tcoord = clamp(vec2(uv.x, (uv.y * uRes.y - top) / (uPaintSize.y * (uRes.x / uPaintSize.x))), 0.0, 1.0);
         vec4 m = texture2D(uMask, tcoord);
         float plane = m.r * 255.0;
         float ink = m.g;
@@ -62,16 +61,10 @@ window.mountBayBody = function mountBayBody(container, {
             uv2 = warp(tcoord, uT, 0.0018, 0.010) + vec2(0.0, 0.0015 * noise(tcoord * 2.0 + uT * 0.011));
         }
         vec4 c = texture2D(uPaint, uv2);
-        // NOTE: the diver plane is NOT punched here. bay-dive.js paints a
-        // tight opaque disc over it; at rest the disc's pixels are identical
-        // to the painting below, so no seam shows. A punched hole would flash
-        // the page background whenever the disc's coverage dips.
         // ink wicks along paper fibres where the mask says an edge was inked:
-        // the line darkens and grows faint hairy side-lines that drift slowly
         float fibre = noise(uv * vec2(90.0, 130.0) + vec2(uT * 0.015, 0.0));
         float line = ink * (0.85 + 0.3 * fibre);
         c.rgb *= 1.0 - 0.16 * line;
-        // faint ink hairs beside strong lines, strongest on the coastline
         float hairs = ink > 0.4 ? (noise(uv * 55.0 + vec2(0.0, uT * 0.02)) - 0.5) * 0.10 * ink : 0.0;
         c.rgb *= 1.0 - max(hairs, 0.0);
 
@@ -116,26 +109,16 @@ window.mountBayBody = function mountBayBody(container, {
 
     const load = src => new Promise((ok, fail) => { const i = new Image(); i.onload = () => ok(i); i.onerror = fail; i.src = src; });
     const ready = Promise.all([fetch(metaUrl).then(r => r.json()), load(planes), load(mask)])
-        .then(([, paint, maskImg]) => {
+        .then(([m, paint, maskImg]) => {
+            meta = { width: m.width, height: m.height };
             upload(0, paint);
             upload(1, maskImg);
             gl.uniform1i(U('uPaint'), 0);
             gl.uniform1i(U('uMask'), 1);
-            return meta => meta;
         })
-        .catch(e => { onFail && onFail(String(e)); return null; });
+        .catch(e => { onFail && onFail(String(e)); throw e; });   // reject: the site's fallback handles it
 
-    let raf = 0, t0 = 0;
-    // The painting at 2048x917 sits in the window at "cover" scale, anchored
-    // so its top edge is the window top and its bottom edge the window bottom;
-    // the shader clamps samples into this rect, extending sky upward and bay
-    // downward with the painting's own colours.
-    const PAINT_W = 2048, PAINT_H = 917;
-    function fitRect(w, h) {
-        const scale = Math.max(w / PAINT_W, h / PAINT_H);
-        const pw = PAINT_W * scale, ph = PAINT_H * scale;
-        return { x: (w - pw) / 2, y: (h - ph) / 2, w: pw, h: ph };
-    }
+    let raf = 0, t0 = 0, meta = null;
     function draw(now) {
         const dpr = Math.min(2, window.devicePixelRatio || 1);
         const w = Math.round(canvas.clientWidth * dpr), h = Math.round(canvas.clientHeight * dpr);
@@ -143,8 +126,7 @@ window.mountBayBody = function mountBayBody(container, {
         if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
         gl.viewport(0, 0, w, h);
         gl.uniform2f(U('uRes'), w, h);
-        const f = fitRect(w, h);
-        gl.uniform4f(U('uPaintFit'), f.x, f.y, f.w, f.h);
+        if (meta) gl.uniform2f(U('uPaintSize'), meta.width, meta.height);
         gl.uniform1f(U('uT'), (now - t0) / 1000);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
         raf = requestAnimationFrame(draw);

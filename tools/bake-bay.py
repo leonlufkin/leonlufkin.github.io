@@ -92,13 +92,30 @@ mask[..., 3] = 255
 Image.fromarray(mask, "RGBA").save(IMG / "bay-mask.png")
 img.save(IMG / "bay-planes.png")
 
-# --------------------------------------------------------------- metadata ---
+# Plane bands, painting px (y down): the shader pulls the three planes apart
+# like a puzzle — sky band pinned to the window top, bay band to the window
+# bottom, diver kept at its painted offset from the diver centre. Each band
+# keeps its own aspect (no stretching); the gaps between them are filled by
+# clamped samples of the band's own colours.
+sky_bottom = int(np.max(horizon))            # lowest reach of the sky band
+sky_top = 0
+bay_top = int(np.min(horizon))               # highest reach of the bay band
+bay_bottom = H
+diver_band = {"top": DIV["y"] - int(DIV["r"] * 1.25) - 4,
+              "bottom": DIV["y"] + int(DIV["r"] * 1.25) + 4,
+              "x0": DIV["x"] - int(DIV["r"]) - 4,
+              "x1": DIV["x"] + int(DIV["r"]) + 4}
 meta = {
     "width": W, "height": H,
     "horizon_y": horizon_y,
     "diver": DIV,
     "planes": {"sky": 1, "diver": 2, "bay": 3},
     "ink_scale": 3.2,
+    "bands": {
+        "sky": {"top": sky_top, "bottom": sky_bottom},
+        "bay": {"top": bay_top, "bottom": bay_bottom},
+        "diver": diver_band,
+    },
 }
 (IMG / "bay.json").write_text(json.dumps(meta, indent=2))
 print(f"baked: horizon_y={horizon_y} diver=({DIV['x']},{DIV['y']}) r={DIV['r']} -> {IMG}")

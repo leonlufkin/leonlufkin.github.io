@@ -18,7 +18,6 @@ window.mountBayDive = function mountBayDive(container, {
 
     const fs = `precision highp float;
     uniform vec2 uRes, uPaintSize;
-    uniform vec4 uPaintFit;  // contained painting rect in window px
     uniform float uT;
     uniform vec2 uPitch;     // tilt as (cos, sin) of the fall-line angle
     uniform float uSpeed;    // 0 at rest -> 1 flat-spinning
@@ -35,14 +34,15 @@ window.mountBayDive = function mountBayDive(container, {
                    mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
     }
 
+    // Same puzzle mapping as bay-body.js: sky band stretched from the window
+    // top to uSplit, bay band from uSplit to the bottom; the diver's disc
+    // lands where the painting's diver sits inside the sky band.
     void main() {
         vec2 uv = gl_FragCoord.xy / uRes;
-        // Same fit as bay-body.js: the painting covers the window, its top
-        // edge at the window top and bottom edge at the window bottom. The
-        // diver cutout lands where the painting's diver sits, mid-window.
-        vec2 px = uv * uRes;
-        vec2 rel = (px - uPaintFit.xy) / uPaintFit.zw;
-        vec2 tcoord = clamp(rel, 0.0, 1.0);              // painting px, y down
+        // Contain the painting at width-fit scale, centred vertically; its
+        // top row extends upward as sky, its bottom row downward as ocean.
+        float top = (uRes.y - uPaintSize.y * (uRes.x / uPaintSize.x)) * 0.5;
+        vec2 tcoord = clamp(vec2(uv.x, (uv.y * uRes.y - top) / (uPaintSize.y * (uRes.x / uPaintSize.x))), 0.0, 1.0);
         vec2 pc = tcoord * uPaintSize;
         vec2 d = pc - uDiver;
 
@@ -120,7 +120,7 @@ window.mountBayDive = function mountBayDive(container, {
     // damped springs, exactly the kea's head logic
     const spring = (k, zeta) => ({ v: 0, target: 0, value: 0, k, c: 2 * zeta * Math.sqrt(k) });
     const pitch = spring(30, 0.55), speed = spring(20, 0.8);
-    let pointer = null, raf = 0, last = 0, fidgetT = 0;
+    let pointer = null, raf = 0, last = 0, fidgetT = 0, meta = null;
     function tick(now) {
         const dt = Math.min((now - last) / 1000, 0.05); last = now;
         // The pointer's pull drives the fall-line: the diver banks toward it.
@@ -141,15 +141,6 @@ window.mountBayDive = function mountBayDive(container, {
         // keep drawing while visible: the canvas composites over the wash layer
         raf = document.hidden ? 0 : requestAnimationFrame(tick);
     }
-    // The painting's contained rect in the window — must match bay-body.js
-    // exactly so both layers' mappings agree (top edge at window top, bottom
-    // at window bottom, centred on x).
-    const PAINT_W = 2048, PAINT_H = 917;
-    function fitRect(w, h) {
-        const scale = Math.max(w / PAINT_W, h / PAINT_H);
-        const pw = PAINT_W * scale, ph = PAINT_H * scale;
-        return { x: (w - pw) / 2, y: (h - ph) / 2, w: pw, h: ph };
-    }
     function draw(now) {
         const dpr = Math.min(2, window.devicePixelRatio || 1);
         const w = Math.round(canvas.clientWidth * dpr), h = Math.round(canvas.clientHeight * dpr);
@@ -159,8 +150,7 @@ window.mountBayDive = function mountBayDive(container, {
         gl.clearColor(0, 0, 0, 0);
         gl.clear(gl.COLOR_BUFFER_BIT);
         gl.uniform2f(U('uRes'), w, h);
-        const f = fitRect(w, h);
-        gl.uniform4f(U('uPaintFit'), f.x, f.y, f.w, f.h);
+        if (meta) gl.uniform2f(U('uPaintSize'), meta.width, meta.height);
         gl.uniform1f(U('uT'), now / 1000);
         gl.uniform2f(U('uPitch'), Math.cos(pitch.value), Math.sin(pitch.value));
         gl.uniform1f(U('uSpeed'), Math.max(0, Math.min(1, speed.value)));
@@ -182,16 +172,16 @@ window.mountBayDive = function mountBayDive(container, {
 
     const load = src => new Promise((ok, fail) => { const i = new Image(); i.onload = () => ok(i); i.onerror = fail; i.src = src; });
     const loaded = Promise.all([fetch(metaUrl).then(r => r.json()), load(planes), load(mask)])
-        .then(([meta, paint, maskImg]) => {
+        .then(([m, paint, maskImg]) => {
+            meta = m;
             upload(0, paint); upload(1, maskImg);
             gl.uniform1i(U('uPaint'), 0);
             gl.uniform1i(U('uMask'), 1);
-            gl.uniform2f(U('uPaintSize'), meta.width, meta.height);
             gl.uniform2f(U('uDiver'), meta.diver.x, meta.diver.y);
             gl.uniform1f(U('uDiverR'), meta.diver.r);
             wake();
         })
-        .catch(e => { onFail && onFail(String(e)); });
+        .catch(e => { onFail && onFail(String(e)); throw e; });   // reject: the site's fallback handles it
 
     return { canvas, ready: loaded, wake };
 };

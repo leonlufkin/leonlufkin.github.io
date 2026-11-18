@@ -12,5 +12,21 @@
     "diver": 2,
     "bay": 3
   },
-  "ink_scale": 3.2
+  "ink_scale": 3.2,
+  "bands": {
+    "sky": {
+      "top": 0,
+      "bottom": 228
+    },
+    "bay": {
+      "top": 194,
+      "bottom": 917
+    },
+    "diver": {
+      "top": 247,
+      "bottom": 375,
+      "x0": 969,
+      "x1": 1073
+    }
+  }
 }
