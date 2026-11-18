@@ -34,13 +34,23 @@ window.mountBayDive = function mountBayDive(container, {
                    mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
     }
 
-    // Same mapping as bay-body.js: contain, centred, y flipped so the
-    // window top samples the painting's top row.
+    // Same puzzle mapping as bay-body.js: the sky band is stretched from the
+    // window top to the horizon line, the bay band from the horizon to the
+    // bottom; the diver's disc lands where the painting's diver sits inside
+    // the sky band. uBands = (skyTop, skyBottom, bayTop, bayBottom) painting px.
+    uniform vec4 uBands;
     void main() {
-        vec2 uv = gl_FragCoord.xy / uRes;
-        float paintH = uPaintSize.y * (uRes.x / uPaintSize.x);
-        float top = (uRes.y - paintH) * 0.5;
-        vec2 tcoord = clamp(vec2(uv.x, 1.0 - (uv.y * uRes.y - top) / paintH), 0.0, 1.0);
+        vec2 uv = gl_FragCoord.xy / uRes;          // uv.y = 0 at window BOTTOM
+        float widthScale = uRes.x / uPaintSize.x;
+        float skyFrac = (uBands.y - uBands.x) * widthScale / uRes.y;
+        float splitUV = 1.0 - skyFrac;             // uv.y above this = sky
+        float tRaw;
+        if (uv.y > splitUV) {
+            tRaw = uBands.x + (uv.y - splitUV) / skyFrac * (uBands.y - uBands.x);
+        } else {
+            tRaw = uBands.w - uv.y / splitUV * (uBands.w - uBands.z);
+        }
+        vec2 tcoord = clamp(vec2(uv.x, tRaw), 0.0, 1.0);
         vec2 pc = tcoord * uPaintSize;
         vec2 d = pc - uDiver;
 
@@ -84,7 +94,7 @@ window.mountBayDive = function mountBayDive(container, {
         const s = gl.createShader(type);
         gl.shaderSource(s, src);
         gl.compileShader(s);
-        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { window.__shaderLog = (window.__shaderLog || []); window.__shaderLog.push(gl.getShaderInfoLog(s)); window.__failedSrc = src.slice(0, 300); throw new Error(gl.getShaderInfoLog(s)); }
         return s;
     }
     let prog;
@@ -148,7 +158,10 @@ window.mountBayDive = function mountBayDive(container, {
         gl.clearColor(0, 0, 0, 0);
         gl.clear(gl.COLOR_BUFFER_BIT);
         gl.uniform2f(U('uRes'), w, h);
-        if (meta) gl.uniform2f(U('uPaintSize'), meta.width, meta.height);
+        if (meta) {
+            gl.uniform2f(U('uPaintSize'), meta.width, meta.height);
+            gl.uniform4f(U('uBands'), meta.bands.sky.top, meta.bands.sky.bottom, meta.bands.bay.top, meta.bands.bay.bottom);
+        }
         gl.uniform1f(U('uT'), now / 1000);
         gl.uniform2f(U('uPitch'), Math.cos(pitch.value), Math.sin(pitch.value));
         gl.uniform1f(U('uSpeed'), Math.max(0, Math.min(1, speed.value)));

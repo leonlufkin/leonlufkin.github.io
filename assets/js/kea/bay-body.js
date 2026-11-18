@@ -19,6 +19,7 @@ window.mountBayBody = function mountBayBody(container, {
     const fs = `precision highp float;
     uniform vec2 uRes;
     uniform vec2 uPaintSize;      // the painting's dimensions, px
+    uniform vec4 uBands;          // (skyTop, skyBottom, bayTop, bayBottom) painting px
     uniform float uT;             // seconds, for the wash drift
     uniform sampler2D uPaint, uMask;
 
@@ -39,18 +40,30 @@ window.mountBayBody = function mountBayBody(container, {
 
     void main() {
         vec2 uv = gl_FragCoord.xy / uRes;          // uv.y = 0 at window BOTTOM
-        // Contain the painting at width-fit scale, centred vertically. The
-        // texture's first row is the painting's TOP, so t = 1 - (windowY -
-        // top)/paintH maps window top -> painting top. Past the edges
-        // CLAMP_TO_EDGE repeats the edge rows: sky colour above, ocean below.
-        float paintH = uPaintSize.y * (uRes.x / uPaintSize.x);
-        float top = (uRes.y - paintH) * 0.5;
-        float tRaw = 1.0 - (uv.y * uRes.y - top) / paintH;
+        // Puzzle mapping — the painting is pulled apart along the baked
+        // plane boundaries (uBands = skyTop, skyBottom, bayTop, bayBottom,
+        // painting px): the sky band is stretched vertically to fill the
+        // window from the top to the horizon line, the bay band fills from
+        // the horizon to the window bottom, and each band's own colours
+        // extend into its side of the split if the bands don't add up to a
+        // full window. X stays width-fit uniform; only y is remapped, so
+        // nothing stretches horizontally. The diver rides in the sky band.
+        float widthScale = uRes.x / uPaintSize.x;
+        float skyFrac = (uBands.y - uBands.x) * widthScale / uRes.y;
+        float splitUV = 1.0 - skyFrac;               // uv.y above this = sky
+        float tRaw;
+        if (uv.y > splitUV) {
+            // sky: uv.y in [splitUV, 1] -> painting rows uBands.x..uBands.y
+            tRaw = uBands.x + (uv.y - splitUV) / skyFrac * (uBands.y - uBands.x);
+        } else {
+            // bay: uv.y in [0, splitUV] -> painting rows uBands.z..uBands.w
+            tRaw = uBands.w - uv.y / splitUV * (uBands.w - uBands.z);
+        }
         vec2 tcoord = clamp(vec2(uv.x, tRaw), 0.0, 1.0);
-        // How far outside the painting this fragment is (0 inside, 1 at the
-        // window edge). The extension smears a single clamped row into
-        // stripes, so average taps across x and blend toward them out there.
-        float outside = clamp(max(-tRaw, tRaw - 1.0) * paintH / uRes.y * 6.0, 0.0, 1.0);
+        // How far outside the painting's band this fragment falls (0 inside,
+        // growing toward the window edges). Clamped sampling smears a single
+        // row into stripes out there, so blend toward a 5-tap x average.
+        float outside = clamp(max(uBands.x - tRaw, tRaw - uBands.w) * uPaintSize.y * widthScale / uRes.y * 6.0, 0.0, 1.0);
         vec4 m = texture2D(uMask, tcoord);
         float plane = m.r * 255.0;
         float ink = m.g;
@@ -88,7 +101,7 @@ window.mountBayBody = function mountBayBody(container, {
         const s = gl.createShader(type);
         gl.shaderSource(s, src);
         gl.compileShader(s);
-        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { window.__shaderLog = (window.__shaderLog || []); window.__shaderLog.push(gl.getShaderInfoLog(s)); window.__failedSrc = src.slice(0, 300); throw new Error(gl.getShaderInfoLog(s)); }
         return s;
     }
     let prog;
@@ -128,6 +141,8 @@ window.mountBayBody = function mountBayBody(container, {
             gl.uniform1i(U('uPaint'), 0);
             gl.uniform1i(U('uMask'), 1);
             gl.uniform2f(U('uPaintSize'), m.width, m.height);
+            const b = m.bands;
+            gl.uniform4f(U('uBands'), b.sky.top, b.sky.bottom, b.bay.top, b.bay.bottom);
         })
         .catch(e => { onFail && onFail(String(e)); throw e; });   // reject: the site's fallback handles it
 
