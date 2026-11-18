@@ -186,6 +186,7 @@ window.mountBayDive = function mountBayDive(container, {
     const load = src => new Promise((ok, fail) => { const i = new Image(); i.onload = () => ok(i); i.onerror = fail; i.src = src; });
     const loaded = Promise.all([fetch(metaUrl).then(r => r.json()), load(planes), load(mask)])
         .then(([m, paint, maskImg]) => {
+            if (!m.bands) throw new Error('stale bay.json: no bands — hard refresh');
             meta = m;
             upload(0, paint); upload(1, maskImg);
             gl.uniform1i(U('uPaint'), 0);

@@ -20,7 +20,7 @@
       // the json is tiny and every rebake rewrites it — never let the
       // browser serve a stale cached copy (old json lacks the band fields
       // the shaders need)
-      meta: '/assets/images/kea/bay.json?v=' + ASSET_V + '&t=' + Date.now(),
+      meta: '/assets/images/kea/bay.json?v=' + ASSET_V + '&t=' + Date.now() + '-a' + (attempt || 0),
     };
     var body = mountBayBody(stage, opts);
     var dive = mountBayDive(stage, opts);
