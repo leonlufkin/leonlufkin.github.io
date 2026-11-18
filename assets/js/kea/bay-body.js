@@ -136,6 +136,8 @@ window.mountBayBody = function mountBayBody(container, {
     const load = src => new Promise((ok, fail) => { const i = new Image(); i.onload = () => ok(i); i.onerror = fail; i.src = src; });
     const ready = Promise.all([fetch(metaUrl).then(r => r.json()), load(planes), load(mask)])
         .then(([m, paint, maskImg]) => {
+            meta = { width: m.width, height: m.height, bands: m.bands };
+            paintImg = paint; maskImg = maskImg;
             upload(0, paint);
             upload(1, maskImg);
             gl.uniform1i(U('uPaint'), 0);
@@ -146,7 +148,19 @@ window.mountBayBody = function mountBayBody(container, {
         })
         .catch(e => { onFail && onFail(String(e)); throw e; });   // reject: the site's fallback handles it
 
-    let raf = 0, t0 = 0;
+    let raf = 0, t0 = 0, meta = null, paintImg = null, maskImg = null;
+    function reinitAfterRestore() {
+        gl.useProgram(prog);
+        upload(0, paintImg); upload(1, maskImg);
+        gl.uniform1i(U('uPaint'), 0);
+        gl.uniform1i(U('uMask'), 1);
+        if (meta) {
+            gl.uniform2f(U('uPaintSize'), meta.width, meta.height);
+            const b = meta.bands;
+            gl.uniform4f(U('uBands'), b.sky.top, b.sky.bottom, b.bay.top, b.bay.bottom);
+        }
+        wake();
+    }
     function draw(now) {
         const dpr = Math.min(2, window.devicePixelRatio || 1);
         const w = Math.round(canvas.clientWidth * dpr), h = Math.round(canvas.clientHeight * dpr);
@@ -161,7 +175,10 @@ window.mountBayBody = function mountBayBody(container, {
     function wake() { if (!raf) { t0 = performance.now() - (t0 || 0); raf = requestAnimationFrame(draw); } }
     document.addEventListener('visibilitychange', () => { if (!document.hidden) wake(); });
     canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); raf = 0; }, false);
-    canvas.addEventListener('webglcontextrestored', () => { location.reload(); }, false);
+    canvas.addEventListener('webglcontextrestored', () => {
+      // re-upload everything onto the fresh context and resume
+      reinitAfterRestore();
+    }, false);
     wake();
 
     return { canvas, ready, wake, draw };

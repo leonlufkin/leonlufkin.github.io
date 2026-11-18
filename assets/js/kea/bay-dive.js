@@ -128,7 +128,7 @@ window.mountBayDive = function mountBayDive(container, {
     // damped springs, exactly the kea's head logic
     const spring = (k, zeta) => ({ v: 0, target: 0, value: 0, k, c: 2 * zeta * Math.sqrt(k) });
     const pitch = spring(30, 0.55), speed = spring(20, 0.8);
-    let pointer = null, raf = 0, last = 0, fidgetT = 0, meta = null;
+    let pointer = null, raf = 0, last = 0, fidgetT = 0, meta = null, paintImg = null, maskImg = null;
     function tick(now) {
         const dt = Math.min((now - last) / 1000, 0.05); last = now;
         // The pointer's pull drives the fall-line: the diver banks toward it.
@@ -149,6 +149,15 @@ window.mountBayDive = function mountBayDive(container, {
         // keep drawing while visible: the canvas composites over the wash layer
         raf = document.hidden ? 0 : requestAnimationFrame(tick);
     }
+    function reinitAfterRestore() {
+        gl.useProgram(prog);
+        upload(0, paintImg); upload(1, maskImg);
+        gl.uniform1i(U('uPaint'), 0);
+        gl.uniform1i(U('uMask'), 1);
+        if (meta) gl.uniform2f(U('uPaintSize'), meta.width, meta.height);
+        wake();
+    }
+
     function draw(now) {
         const dpr = Math.min(2, window.devicePixelRatio || 1);
         const w = Math.round(canvas.clientWidth * dpr), h = Math.round(canvas.clientHeight * dpr);
@@ -181,7 +190,9 @@ window.mountBayDive = function mountBayDive(container, {
     }, { passive: true });
     document.addEventListener('visibilitychange', () => { if (!document.hidden) wake(); });
     canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); raf = 0; }, false);
-    canvas.addEventListener('webglcontextrestored', () => { location.reload(); }, false);
+    canvas.addEventListener('webglcontextrestored', () => {
+      reinitAfterRestore();
+    }, false);
 
     const load = src => new Promise((ok, fail) => { const i = new Image(); i.onload = () => ok(i); i.onerror = fail; i.src = src; });
     const loaded = Promise.all([fetch(metaUrl).then(r => r.json()), load(planes), load(mask)])
