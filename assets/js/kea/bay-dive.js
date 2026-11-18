@@ -204,6 +204,9 @@ window.mountBayDive = function mountBayDive(container, {
             gl.uniform1i(U('uMask'), 1);
             gl.uniform2f(U('uDiver'), meta.diver.x, meta.diver.y);
             gl.uniform1f(U('uDiverR'), meta.diver.r);
+            canvas.style.position = 'absolute';
+            canvas.style.inset = '0';
+            container.append(canvas);
             wake();
         })
         .catch(e => { onFail && onFail(String(e)); throw e; });   // reject: the site's fallback handles it

@@ -145,6 +145,9 @@ window.mountBayBody = function mountBayBody(container, {
             gl.uniform2f(U('uPaintSize'), m.width, m.height);
             const b = m.bands;
             gl.uniform4f(U('uBands'), b.sky.top, b.sky.bottom, b.bay.top, b.bay.bottom);
+            canvas.style.position = 'absolute';
+            canvas.style.inset = '0';
+            container.append(canvas);
         })
         .catch(e => { onFail && onFail(String(e)); throw e; });   // reject: the site's fallback handles it
 

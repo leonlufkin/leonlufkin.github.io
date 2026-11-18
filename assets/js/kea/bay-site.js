@@ -20,10 +20,16 @@
       // the json is tiny and every rebake rewrites it — never let the
       // browser serve a stale cached copy (old json lacks the band fields
       // the shaders need)
-      meta: '/assets/images/kea/bay.json?v=' + ASSET_V + '&t=' + Date.now() + '-a' + (attempt || 0),
+      meta: '/assets/images/kea/bay.json?v=' + ASSET_V + '&t=' + Date.now(),
     };
-    var body = mountBayBody(stage, opts);
-    var dive = mountBayDive(stage, opts);
+    var body, dive;
+    try {
+      body = mountBayBody(stage, opts);
+      dive = mountBayDive(stage, opts);
+    } catch (e) {
+      window.__log.push('SYNC THROW: ' + e.message);
+      throw e;
+    }
     stage.appendChild(body.canvas);
     stage.appendChild(dive.canvas);
     document.body.appendChild(stage);
@@ -38,7 +44,12 @@
     // canvas sizing lives in the stylesheet (#bay-stage canvas fills the
     // window); the shaders fit the painting inside (top edge = window top,
     // bottom edge = window bottom, colours extended beyond)
-    return Promise.all([body.ready, dive.ready]).then(function () {
+    function withTimeout(p, ms) {
+      return Promise.race([p, new Promise(function (_, rej) {
+        setTimeout(function () { rej(new Error('mount timeout')); }, ms);
+      })]);
+    }
+    return withTimeout(Promise.all([body.ready, dive.ready]), 4000).then(function () {
       body.draw(performance.now());
       dive.draw(performance.now());
       return new Promise(function (resolve) {
@@ -61,7 +72,7 @@
     mount().catch(function () {
       // transient load failures happen (six parallel fetches on a cold cache);
       // one retry before falling back to the static photo
-      if (attempt < 1) setTimeout(function () { start(attempt + 1); }, 800);
+      if (attempt < 2) setTimeout(function () { start(attempt + 1); }, 1200);
     });
   }
 
