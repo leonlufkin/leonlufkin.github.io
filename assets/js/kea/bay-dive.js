@@ -34,15 +34,13 @@ window.mountBayDive = function mountBayDive(container, {
                    mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
     }
 
-    // Same puzzle mapping as bay-body.js: sky band stretched from the window
-    // top to uSplit, bay band from uSplit to the bottom; the diver's disc
-    // lands where the painting's diver sits inside the sky band.
+    // Same mapping as bay-body.js: contain, centred, y flipped so the
+    // window top samples the painting's top row.
     void main() {
         vec2 uv = gl_FragCoord.xy / uRes;
-        // Contain the painting at width-fit scale, centred vertically; its
-        // top row extends upward as sky, its bottom row downward as ocean.
-        float top = (uRes.y - uPaintSize.y * (uRes.x / uPaintSize.x)) * 0.5;
-        vec2 tcoord = clamp(vec2(uv.x, (uv.y * uRes.y - top) / (uPaintSize.y * (uRes.x / uPaintSize.x))), 0.0, 1.0);
+        float paintH = uPaintSize.y * (uRes.x / uPaintSize.x);
+        float top = (uRes.y - paintH) * 0.5;
+        vec2 tcoord = clamp(vec2(uv.x, 1.0 - (uv.y * uRes.y - top) / paintH), 0.0, 1.0);
         vec2 pc = tcoord * uPaintSize;
         vec2 d = pc - uDiver;
 
@@ -183,5 +181,5 @@ window.mountBayDive = function mountBayDive(container, {
         })
         .catch(e => { onFail && onFail(String(e)); throw e; });   // reject: the site's fallback handles it
 
-    return { canvas, ready: loaded, wake };
+    return { canvas, ready: loaded, wake, draw };
 };

@@ -22,7 +22,6 @@ window.mountBayBody = function mountBayBody(container, {
     uniform float uT;             // seconds, for the wash drift
     uniform sampler2D uPaint, uMask;
 
-
     float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
     float noise(vec2 p) {
         vec2 i = floor(p), f = fract(p);
@@ -39,14 +38,19 @@ window.mountBayBody = function mountBayBody(container, {
     }
 
     void main() {
-        vec2 uv = gl_FragCoord.xy / uRes;          // uv.y = 0 at BOTTOM
-        // The window splits into a sky band (top) and a bay band (bottom).
-        // Each painting band is stretched to fill its window band vertically;
-        // x stays uniform (width-fit), so nothing stretches horizontally.
-        // Contain the painting at width-fit scale, centred vertically; its
-        // top row extends upward as sky, its bottom row downward as ocean.
-        float top = (uRes.y - uPaintSize.y * (uRes.x / uPaintSize.x)) * 0.5;
-        vec2 tcoord = clamp(vec2(uv.x, (uv.y * uRes.y - top) / (uPaintSize.y * (uRes.x / uPaintSize.x))), 0.0, 1.0);
+        vec2 uv = gl_FragCoord.xy / uRes;          // uv.y = 0 at window BOTTOM
+        // Contain the painting at width-fit scale, centred vertically. The
+        // texture's first row is the painting's TOP, so t = 1 - (windowY -
+        // top)/paintH maps window top -> painting top. Past the edges
+        // CLAMP_TO_EDGE repeats the edge rows: sky colour above, ocean below.
+        float paintH = uPaintSize.y * (uRes.x / uPaintSize.x);
+        float top = (uRes.y - paintH) * 0.5;
+        float tRaw = 1.0 - (uv.y * uRes.y - top) / paintH;
+        vec2 tcoord = clamp(vec2(uv.x, tRaw), 0.0, 1.0);
+        // How far outside the painting this fragment is (0 inside, 1 at the
+        // window edge). The extension smears a single clamped row into
+        // stripes, so average taps across x and blend toward them out there.
+        float outside = clamp(max(-tRaw, tRaw - 1.0) * paintH / uRes.y * 6.0, 0.0, 1.0);
         vec4 m = texture2D(uMask, tcoord);
         float plane = m.r * 255.0;
         float ink = m.g;
@@ -61,12 +65,21 @@ window.mountBayBody = function mountBayBody(container, {
             uv2 = warp(tcoord, uT, 0.0018, 0.010) + vec2(0.0, 0.0015 * noise(tcoord * 2.0 + uT * 0.011));
         }
         vec4 c = texture2D(uPaint, uv2);
+        // Outside the painting: average the clamped row over a wide x-window
+        // (5 wide taps) to kill streaks, and blend toward it as the fragment
+        // gets further outside.
+        vec4 ext = (texture2D(uPaint, vec2(tcoord.x - 0.03, tcoord.y)) +
+                    texture2D(uPaint, vec2(tcoord.x - 0.015, tcoord.y)) +
+                    texture2D(uPaint, tcoord) +
+                    texture2D(uPaint, vec2(tcoord.x + 0.015, tcoord.y)) +
+                    texture2D(uPaint, vec2(tcoord.x + 0.03, tcoord.y))) * 0.2;
+        c = mix(c, ext, outside);
         // ink wicks along paper fibres where the mask says an edge was inked:
         float fibre = noise(uv * vec2(90.0, 130.0) + vec2(uT * 0.015, 0.0));
-        float line = ink * (0.85 + 0.3 * fibre);
+        float line = ink * (0.85 + 0.3 * fibre) * (1.0 - outside);
         c.rgb *= 1.0 - 0.16 * line;
         float hairs = ink > 0.4 ? (noise(uv * 55.0 + vec2(0.0, uT * 0.02)) - 0.5) * 0.10 * ink : 0.0;
-        c.rgb *= 1.0 - max(hairs, 0.0);
+        c.rgb *= 1.0 - max(hairs, 0.0) * (1.0 - outside);
 
         gl_FragColor = c;
     }`;
@@ -110,15 +123,15 @@ window.mountBayBody = function mountBayBody(container, {
     const load = src => new Promise((ok, fail) => { const i = new Image(); i.onload = () => ok(i); i.onerror = fail; i.src = src; });
     const ready = Promise.all([fetch(metaUrl).then(r => r.json()), load(planes), load(mask)])
         .then(([m, paint, maskImg]) => {
-            meta = { width: m.width, height: m.height };
             upload(0, paint);
             upload(1, maskImg);
             gl.uniform1i(U('uPaint'), 0);
             gl.uniform1i(U('uMask'), 1);
+            gl.uniform2f(U('uPaintSize'), m.width, m.height);
         })
         .catch(e => { onFail && onFail(String(e)); throw e; });   // reject: the site's fallback handles it
 
-    let raf = 0, t0 = 0, meta = null;
+    let raf = 0, t0 = 0;
     function draw(now) {
         const dpr = Math.min(2, window.devicePixelRatio || 1);
         const w = Math.round(canvas.clientWidth * dpr), h = Math.round(canvas.clientHeight * dpr);
@@ -126,7 +139,6 @@ window.mountBayBody = function mountBayBody(container, {
         if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
         gl.viewport(0, 0, w, h);
         gl.uniform2f(U('uRes'), w, h);
-        if (meta) gl.uniform2f(U('uPaintSize'), meta.width, meta.height);
         gl.uniform1f(U('uT'), (now - t0) / 1000);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
         raf = requestAnimationFrame(draw);
@@ -135,5 +147,5 @@ window.mountBayBody = function mountBayBody(container, {
     document.addEventListener('visibilitychange', () => { if (!document.hidden) wake(); });
     wake();
 
-    return { canvas, ready, wake };
+    return { canvas, ready, wake, draw };
 };

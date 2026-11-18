@@ -7,21 +7,23 @@
 
   // Bump ASSET_V whenever tools/bake-bay.py rewrites the textures/metadata:
   // the browser otherwise serves the stale cached bake for the bare URLs.
-  var ASSET_V = '2';
+  var ASSET_V = '8';
 
   function mount() {
+    window.__bayMountRan = (window.__bayMountRan || 0) + 1;
     var stage = document.createElement('div');
     stage.id = 'bay-stage';
     stage.setAttribute('aria-hidden', 'true');
-    var ASSET_V = '7';
     var opts = {
       planes: '/assets/images/kea/bay-planes.png?v=' + ASSET_V,
       mask: '/assets/images/kea/bay-mask.png?v=' + ASSET_V,
       meta: '/assets/images/kea/bay.json?v=' + ASSET_V,
-      onFail: function () { stage.remove(); }
+      onFail: function (reason) { window.__bayFail = 'onFail: ' + reason; stage.remove(); }
     };
     var body = mountBayBody(stage, opts);
+    window.__bodyType = typeof body;
     var dive = mountBayDive(stage, opts);
+    window.__diveType = typeof dive;
     // canvas sizing lives in the stylesheet (#bay-stage canvas fills the
     // window); the shaders fit the painting inside (top edge = window top,
     // bottom edge = window bottom, colours extended beyond)
@@ -29,10 +31,13 @@
     stage.appendChild(dive.canvas);
     document.body.appendChild(stage);
     // Hide the static photo only once both live layers have actually painted:
-    // has-bay before that would flash the page background instead.
+    // has-bay before that would flash the page background instead. Draw once
+    // synchronously first — a backgrounded tab starves rAF, and without this
+    // the canvases would stay blank until it becomes visible.
     return Promise.all([body.ready, dive.ready]).then(function () {
+      body.draw(performance.now());
+      dive.draw(performance.now());
       return new Promise(function (resolve) {
-        // two frames out: both raf loops have composed at least one frame
         requestAnimationFrame(function () {
           requestAnimationFrame(resolve);
         });
@@ -40,13 +45,16 @@
     }).then(function () {
       document.documentElement.classList.add('has-bay');
     }).catch(function (e) {
+      // either layer failed: fall back to the static photo
       console.error('bay mount failed:', e && e.message || e);
+      window.__bayFail = String(e && e.message || e);
       stage.remove();
       throw e;
     });
   }
 
   function start(attempt) {
+    window.__bayAttempt = attempt;
     mount().catch(function () {
       // transient load failures happen (six parallel fetches on a cold cache);
       // one retry before falling back to the static photo
