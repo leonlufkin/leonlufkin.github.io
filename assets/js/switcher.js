@@ -124,12 +124,11 @@
   // Defaults mirror the styles baked into style.css (Georgia; hairline boxes
   // are baked in, so "Site default" applies no inline override).
   // Theme is handled by the site's real toggle (site.js), not the picker.
-  var DEFAULTS = { f: 0, z: 1, l: 0, k: 0, n: 0, o: 0, c: 0, i: 0, b: 12, min: 0 };
+  var DEFAULTS = { f: 0, z: 1, l: 0, k: 0, n: 0, o: 0, c: 0, i: 0, min: 0 };
   var s;
   // v5 key: ignore state saved before Line/Fill/Color became independent rows
   try { s = JSON.parse(localStorage.getItem("stylePreview-v9")) || {}; } catch (e) { s = {}; }
   for (var k in DEFAULTS) { if (typeof s[k] !== "number") s[k] = DEFAULTS[k]; }
-  s.b = Number.isFinite(s.b) ? Math.max(0, Math.min(40, s.b)) : 12;
 
   // Resolve the old index in its ORIGINAL unfiltered list exactly once.
   // An incompatible legacy choice is discarded, never reinterpreted as a
@@ -169,11 +168,6 @@
     "#style-switcher button{cursor:pointer;height:22px;min-width:22px;line-height:1;" +
     "border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--text)}" +
     "#style-switcher button:hover{border-color:var(--muted)}" +
-    "#style-switcher .photo-blend-control{display:grid;grid-template-columns:1fr auto;" +
-    "gap:3px 10px;min-width:220px;margin-top:7px}" +
-    "#style-switcher .photo-blend-control output{font-variant-numeric:tabular-nums;color:var(--muted)}" +
-    "#style-switcher .photo-blend-control input{grid-column:1/-1;width:100%;height:18px;" +
-    "margin:0;cursor:pointer;accent-color:var(--accent)}" +
     "#style-switcher.sw-min .row{display:none}" +
     "#style-switcher.sw-min{padding:6px 10px}" +
     "#style-switcher.sw-min .hd{margin:0}";
@@ -185,11 +179,6 @@
     '<div class="hd"><span>Style preview</span><span class="btns">' +
     '<button id="sw-reset" title="Back to defaults">reset</button>' +
     '<button id="sw-min" title="Collapse">&ndash;</button></span></div>';
-  html += '<div class="photo-blend-control">' +
-    '<label for="sw-photo-blend">Photo blend</label>' +
-    '<output id="sw-photo-blend-value" for="sw-photo-blend"></output>' +
-    '<input id="sw-photo-blend" type="range" min="0" max="40" step="1" ' +
-    'title="Increase to soften a wider strip where the photo meets the background."></div>';
   ROWS.forEach(function (r) {
     html +=
       '<div class="row"><span class="lab">' + r.label + "</span>" +
@@ -200,44 +189,52 @@
   panel.innerHTML = html;
   document.body.appendChild(panel);
 
-  function applyPhotoBlend() {
-    root.style.setProperty("--photo-blend-width", s.b + "%");
-    var dial = document.getElementById("sw-photo-blend");
-    dial.value = String(s.b);
-    dial.setAttribute("aria-valuetext", s.b === 0 ? "Sharp boundary" : s.b + "% blend width");
-    document.getElementById("sw-photo-blend-value").textContent = s.b + "%";
-  }
-  document.getElementById("sw-photo-blend").addEventListener("input", function (event) {
-    s.b = Math.max(0, Math.min(40, Number(event.target.value) || 0));
-    applyPhotoBlend();
-    try { localStorage.setItem("stylePreview-v9", JSON.stringify(s)); } catch (e) {}
-  });
 
   function target() {
     return document.querySelector(".intro") || document.querySelector("main");
   }
 
-  // Average the photo pixels behind the box, composite the wash over them,
-  // and expose the result as --sampled-bg for the "Blend" border styles.
-  var lastSampleKey = null;
+  // Blend samples the visible layers; it must not decode a second, complete SVG.
+  var lastSampleKey = null, sampleRequest = 0;
   function sampleBehindBox(t) {
     var cs = getComputedStyle(root);
     var bgi = (root.style.getPropertyValue("--bg-image") || "").trim();
     var url = bgi ? bgi.slice(bgi.indexOf('("') + 2, bgi.lastIndexOf('")'))
                   : "/assets/images/background-web.jpg";
+    var layered = window.SiteLandscape && root.classList.contains("has-landscape");
     var r = t.getBoundingClientRect();
-    var key = [url, Math.round(r.left), Math.round(r.top), Math.round(r.width),
+    var key = [url, !!layered, Math.round(r.left), Math.round(r.top), Math.round(r.width),
                Math.round(r.height), innerWidth, innerHeight,
                cs.getPropertyValue("--wash")].join("|");
     if (key === lastSampleKey) return;
-
+    var request = ++sampleRequest;
+    function finish(avg, wash) {
+      if (request !== sampleRequest) return;
+      if (!avg) {
+        var sky = (cs.getPropertyValue("--sky") || "#8aa3c9").trim().replace("#", "");
+        if (sky.length === 3) sky = sky.replace(/./g, "$&$&");
+        avg = [parseInt(sky.slice(0, 2), 16), parseInt(sky.slice(2, 4), 16), parseInt(sky.slice(4, 6), 16)];
+      }
+      var m = wash && (cs.getPropertyValue("--wash") || "").match(/rgba?\(([\d.]+)[, ]+([\d.]+)[, ]+([\d.]+)(?:[,/ ]+([\d.]+))?\)/);
+      if (m) {
+        var a = m[4] != null ? parseFloat(m[4]) : 1;
+        avg = [+m[1] * a + avg[0] * (1 - a), +m[2] * a + avg[1] * (1 - a), +m[3] * a + avg[2] * (1 - a)];
+      }
+      root.style.setProperty("--sampled-bg", "#" + avg.map(function (v) {
+        return ("0" + Math.round(v).toString(16)).slice(-2);
+      }).join(""));
+      lastSampleKey = key;
+    }
+    if (layered) {
+      window.SiteLandscape.sample(r).then(function (avg) { finish(avg, false); }, function () { finish(null, false); });
+      return;
+    }
     var img = new Image();
     img.onload = function () {
       var W = innerWidth, H = innerHeight;
       var sc = Math.min(W / img.naturalWidth, H / img.naturalHeight);
       var dispW = img.naturalWidth * sc, dispH = img.naturalHeight * sc;
       var left = (W - dispW) / 2, top = (H - dispH) / 2;
-
       var x0 = Math.max(r.left, left), x1 = Math.min(r.right, left + dispW);
       var y0 = Math.max(r.top, top), y1 = Math.min(r.bottom, top + dispH);
       var avg = null;
@@ -254,30 +251,23 @@
           avg = [R / n, G / n, B / n];
         } catch (e) { avg = null; }
       }
-      if (!avg) { // box sits over the side fill, not the photo
-        var sky = (cs.getPropertyValue("--sky") || "#8aa3c9").trim().replace("#", "");
-        if (sky.length === 3) sky = sky.replace(/./g, "$&$&");
-        avg = [parseInt(sky.slice(0, 2), 16), parseInt(sky.slice(2, 4), 16), parseInt(sky.slice(4, 6), 16)];
-      }
-      var m = (cs.getPropertyValue("--wash") || "").match(/rgba?\(([\d.]+)[, ]+([\d.]+)[, ]+([\d.]+)(?:[,/ ]+([\d.]+))?\)/);
-      if (m) {
-        var a = m[4] != null ? parseFloat(m[4]) : 1;
-        avg = [+m[1] * a + avg[0] * (1 - a), +m[2] * a + avg[1] * (1 - a), +m[3] * a + avg[2] * (1 - a)];
-      }
-      root.style.setProperty("--sampled-bg", "#" + avg.map(function (v) {
-        return ("0" + Math.round(v).toString(16)).slice(-2);
-      }).join(""));
-      lastSampleKey = key;
+      finish(avg, true);
     };
     img.src = url;
   }
 
   var resizeTimer = null;
-  addEventListener("resize", function () {
+  function scheduleSample() {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(function () {
       if (s.n === 1) { var t = target(); if (t) sampleBehindBox(t); }
     }, 150);
+  }
+  addEventListener("resize", scheduleSample);
+  addEventListener("landscapegeometrychange", function () {
+    lastSampleKey = null;
+    sampleRequest++;
+    scheduleSample();
   });
 
   function effectiveDark() {
@@ -287,7 +277,6 @@
   }
 
   function apply() {
-    applyPhotoBlend();
     document.body.style.fontFamily = FONTS[s.f][1];
     document.body.style.fontSize = SIZES[s.z];
 

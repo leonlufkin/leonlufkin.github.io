@@ -7,30 +7,31 @@
   <meta name="robots" content="noindex">
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <link rel="preload" href="/assets/fonts/lmroman-regular.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="/assets/css/style.css?v=50">
+  <link rel="preload" href="/assets/images/skydiving-sky.svg" as="image" type="image/svg+xml" fetchpriority="high">
+  <link rel="preload" href="/assets/images/skydiving-coast.svg" as="image" type="image/svg+xml" fetchpriority="high">
+  <link rel="preload" href="/assets/images/skydiving-diver.svg" as="image" type="image/svg+xml" fetchpriority="high">
+  <link rel="stylesheet" href="/assets/css/style.css?v=56">
   <link rel="stylesheet" href="/assets/css/gallery.css?v=1">
   <script>/* Restore a fitting session photo before paint; site.js checks the manifest. */
 (function () {
   var root = document.documentElement;
+  root.classList.add("has-landscape");
   try {
     var theme = localStorage.getItem("theme");
     if (theme) root.classList.add(theme);
     var pick = JSON.parse(sessionStorage.getItem("bg") || "null");
     var mode = (theme ? theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches) ? "d" : "l";
     var ratio = Math.max(1, innerWidth) / Math.max(1, innerHeight);
-    if (pick && pick.v === 3 && !pick.preview && pick.m === mode && pick.viewport === ratio) {
+    if (pick && pick.v === 6 && !pick.preview && pick.m === mode && pick.viewport === ratio) {
+      root.classList.toggle("has-landscape", !!pick.layered);
       root.style.setProperty("--bg-image", 'url("' + pick.u + '")');
       root.style.setProperty("--sky", pick.c);
       if (pick.width > 0 && pick.height > 0) {
         var aspect = pick.width / pick.height;
         root.style.setProperty("--photo-ratio", String(aspect));
         root.style.setProperty("--photo-inverse", String(1 / aspect));
-        var direction = Math.abs(ratio - aspect) < 0.000001 ? null : ratio > aspect ? "right" : "bottom";
-        root.style.setProperty("--photo-seam", direction
-          ? "linear-gradient(to " + direction + ", transparent, #000 var(--photo-feather), #000 calc(100% - var(--photo-feather)), transparent)"
-          : "none");
       }
-      if (ratio > pick.width / pick.height && pick.rows && ["left", "right"].every(function (side) {
+      if (!pick.layered && ratio > pick.width / pick.height && pick.rows && ["left", "right"].every(function (side) {
         return typeof pick.rows[side] === "string" && pick.rows[side].indexOf("data:image/png;base64,") === 0;
       })) {
         ["left", "right"].forEach(function (side) {
@@ -40,14 +41,14 @@
     }
   } catch (e) {}
 })();</script>
-  <script src="/assets/js/backgrounds.js?v=17" defer></script>
+  <script src="/assets/js/backgrounds.js?v=19" defer></script>
   <script src="/assets/js/gate.js?v=1" defer></script>
-  <script src="/assets/js/background-selections.js?v=1" defer></script>
-  <script src="/assets/js/site.js?v=19" defer></script>
+  <script src="/assets/js/background-selections.js?v=2" defer></script>
+  <script src="/assets/js/background-rows.js?v=3" defer></script>
+  <script src="/assets/js/site.js?v=22" defer></script>
+  <script src="/assets/js/landscape-gpu.js?v=1" defer></script>
+  <script src="/assets/js/landscape.js?v=4" defer onerror="document.documentElement.classList.remove('has-landscape')"></script>
   <script src="/assets/js/gallery.js?v=4" defer></script>
-  <script src="/assets/js/kea/bay-body.js?v=40" defer></script>
-  <script src="/assets/js/kea/bay-dive.js?v=41" defer></script>
-  <script src="/assets/js/kea/bay-site.js?v=43" defer></script>
 </head>
 
 <body>

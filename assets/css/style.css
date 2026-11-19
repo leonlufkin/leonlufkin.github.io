@@ -45,19 +45,16 @@
 }
 
 :root {
-  /* --photo-seam is defined here by site.js, so its width dependency must
-     resolve here too, before the computed gradient is inherited by ::after. */
-  --photo-feather: var(--photo-blend-width, 12%);
   --bg: #ffffff;
   --text: #1a1a1a;
   --muted: #666666;
   --line: #e5e5e5;
   --accent: #0645ad;
   --accent-soft: #dce6f5;
-  --wash: rgba(255, 255, 255, 0.25); /* the watercolor is pale; a heavy wash flattens it */
-  --sky: #559bd1; /* sampled from the watercolor's own bay; fills width beyond the image */
-  --photo-ratio: 2.2326;
-  --photo-inverse: 0.4479;
+  --wash: rgba(255, 255, 255, 0.25);
+  --sky: #72bcf6;
+  --photo-ratio: 2.232166;
+  --photo-inverse: 0.447995;
 }
 
 /* Dark palette applies when forced via the toggle (html.dark), or — for the
@@ -96,8 +93,7 @@ html {
   display: none;
 }
 
-/* Fill and photo share the same wash. Feather only the photo's boundary
-   into the fill; the central image remains sharp and at contain geometry. */
+/* Ambient fill surrounds the unmodified external artwork. */
 body::before {
   content: "";
   position: fixed;
@@ -110,25 +106,6 @@ body::before {
     var(--bg-rows-right, none) right / 50% 100% no-repeat var(--sky);
 }
 
-/* The living watercolor (bay-body.js + bay-dive.js). The canvases fill the
-   window; the shader fits the painting inside them with its top edge at the
-   window top and bottom edge at the window bottom, extending the sky and bay
-   colours beyond it. The static photo layer hides once mounted. */
-#bay-stage {
-  position: fixed;
-  inset: 0;
-  z-index: -2;
-  pointer-events: none;
-}
-#bay-stage canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-.has-bay body::after {
-  visibility: hidden;
-}
 
 body::after {
   content: "";
@@ -142,15 +119,42 @@ body::after {
   height: min(100dvh, calc(100vw * var(--photo-inverse, 1.3333333333333333)));
   z-index: -2;
   pointer-events: none;
-  background:
-    linear-gradient(var(--wash), var(--wash)),
-    var(--bg-image, url("../images/background-web.jpg")) center / contain no-repeat;
-  -webkit-mask-image: var(--photo-seam, none);
-  mask-image: var(--photo-seam, none);
+  background: var(--bg-image, url("../images/skydiving.svg")) center / contain no-repeat;
 }
 
-/* Quiet generated surroundings stay behind the sharp original photograph.
-   Blur is applied to this layer itself, as well as feathering the photo seam. */
+/* Layered artwork replaces the full SVG without requesting both versions. */
+.has-landscape body::after { content: none; }
+#landscape-stage {
+  display: none;
+  visibility: hidden;
+  position: fixed;
+  z-index: -2;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  pointer-events: none;
+  contain: layout paint;
+}
+.has-landscape #landscape-stage { display: block; }
+#landscape-stage.is-ready { visibility: visible; }
+.landscape-fill,
+.landscape-gpu {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+.landscape-gpu { display: none; }
+.has-gpu .landscape-gpu { display: block; }
+.has-gpu .landscape-fill,
+.landscape-piece { display: none; }
+
+/* Quiet generated surroundings stay behind the sharp external artwork.
+   Blur and feathering affect only this surrounding layer. */
 #bg-extension { display: none; }
 .has-extension #bg-extension {
   display: block;
@@ -568,6 +572,7 @@ body.home main {
   body::before,
   body::after,
   #bg-extension,
+  #landscape-stage,
   main::before,
   header,
   nav,

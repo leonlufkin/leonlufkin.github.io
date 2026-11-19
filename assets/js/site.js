@@ -143,13 +143,17 @@
   }
   function applyRows(p) {
     var request = ++rowRequest;
-    var horizontal = viewportRatio() > p.width / p.height;
+    var horizontal = !p.layered && viewportRatio() > p.width / p.height;
     root.style.removeProperty("--bg-rows"); // discard the old shared-color profile
     if (!horizontal || rowPhoto !== p.u) {
       root.style.removeProperty("--bg-rows-left");
       root.style.removeProperty("--bg-rows-right");
     }
     rowPhoto = horizontal ? p.u : null;
+    if (p.layered) {
+      delete p.rows;
+      return;
+    }
     if (!horizontal || !window.BackgroundRows) return;
     if (validRows(p.rows)) showRows(p.rows);
     window.BackgroundRows.get(p.u).then(function (rows) {
@@ -162,7 +166,7 @@
   }
 
   function applyExtension(p) {
-    var active = !!p.extension && viewportRatio() > p.width / p.height;
+    var active = !p.layered && !!p.extension && viewportRatio() > p.width / p.height;
     root.classList.toggle("has-extension", active);
     if (!active) {
       ["--bg-extension", "--extension-width", "--extension-height"]
@@ -183,15 +187,12 @@
   }
 
   function applyPick(p) {
+    root.classList.toggle("has-landscape", !!p.layered);
     root.style.setProperty("--bg-image", 'url("' + p.u + '")');
     root.style.setProperty("--sky", p.c);
-    var aspect = p.width / p.height, ratio = viewportRatio();
+    var aspect = p.width / p.height;
     root.style.setProperty("--photo-ratio", String(aspect));
     root.style.setProperty("--photo-inverse", String(1 / aspect));
-    var direction = Math.abs(ratio - aspect) < 0.000001 ? null : ratio > aspect ? "right" : "bottom";
-    root.style.setProperty("--photo-seam", direction
-      ? "linear-gradient(to " + direction + ", transparent, #000 var(--photo-feather), #000 calc(100% - var(--photo-feather)), transparent)"
-      : "none");
     applyRows(p);
     applyExtension(p);
     // Clear overrides left by older sessions or the previous preview tool.
@@ -205,13 +206,14 @@
   }
 
   function savePick(e, manual, preview) {
-    var p = { v: 3, m: isDark() ? "d" : "l", u: e.u, c: edgeColor(e), l: e.l,
+    var p = { v: 6, m: isDark() ? "d" : "l", u: e.u, c: edgeColor(e), l: e.l,
       width: e.width, height: e.height, viewport: viewportRatio(), device: device(),
-      manual: !!manual, preview: !!preview };
+      manual: !!manual, preview: !!preview, layered: !!e.layers };
     if (e.edge) p.edge = e.edge;
     if (e.extension) p.extension = e.extension;
     var previous = sessionPick();
-    if (previous && previous.u === e.u && validRows(previous.rows)) p.rows = previous.rows;
+    // The asset changed at the same URL; only reuse samples from this revision.
+    if (!p.layered && previous && previous.v === p.v && previous.u === e.u && validRows(previous.rows)) p.rows = previous.rows;
     try { sessionStorage.setItem("bg", JSON.stringify(p)); } catch (err) {}
     applyPick(p);
   }
@@ -261,7 +263,7 @@
   var focusPhoto = /(?:^|[?&])photo=([a-z0-9_-]+)(?:&|$)/.exec(location.search || "");
   if (focusPhoto) {
     previewPick = all().find(function (e) {
-      return e.u.split("/").pop() === focusPhoto[1] + ".jpg";
+      return e.u.split("/").pop().replace(/\.[^.]+$/, "") === focusPhoto[1];
     }) || null;
   }
   applyTheme();

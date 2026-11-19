@@ -8,8 +8,33 @@ const vm = require('node:vm');
 const root = path.resolve(__dirname, '..');
 const source = name => fs.readFileSync(path.join(root, name), 'utf8');
 
+// Synthetic inventory exercises selection independently of the published artwork.
+// URLs are identities only: this DOM fixture never loads image files.
+function testCatalog() {
+  const photo = (mode, name, width, height, label = name) => ({
+    u: `/assets/backgrounds/${mode}/${name}.jpg`, c: '#789abc', width, height, l: label,
+    edge: { sides: '#56789a', caps: '#abcdef' },
+  });
+  return {
+    light: [
+      photo('light', 'landscape_one', 1600, 1000),
+      photo('light', 'landscape_two', 1600, 1000),
+      photo('light', 'panorama', 3200, 1000),
+      photo('light', 'thun_schlosssommer', 1200, 1600, 'Thun'),
+      photo('light', 'aoujeft_oasis', 1200, 1600, 'Aoujeft'),
+      { ...photo('light', 'sossusvlei_dune2', 1200, 1600, 'Sossusvlei'),
+        extension: { u: '/fixtures/sossusvlei-extension.png', width: 1585, height: 992 } },
+    ],
+    dark: [
+      photo('dark', 'landscape', 1600, 1000),
+      photo('dark', 'panorama', 3200, 1000),
+      photo('dark', 'portrait', 1200, 1600),
+    ],
+  };
+}
+
 function browser({ width = 1440, height = 900, theme = 'light', pick, preview, coarse = false,
-  hostname = 'localhost', search = '', selectedSets, rowLoader } = {}) {
+  hostname = 'localhost', search = '', selectedSets, rowLoader, catalog = testCatalog() } = {}) {
   const nodes = new Map(), listeners = new Map(), timers = new Map();
   let nextTimer = 0, fetchError = null;
   const requests = [];
@@ -97,8 +122,12 @@ function browser({ width = 1440, height = 900, theme = 'light', pick, preview, c
   if (rowLoader) context.BackgroundRows = { get: rowLoader };
   vm.createContext(context);
   function run(name) { vm.runInContext(source(name), context, { filename: name }); }
-  run('assets/js/backgrounds.js');
-  run('assets/js/background-selections.js');
+  if (catalog) {
+    vm.runInContext('window.BACKGROUNDS = ' + JSON.stringify(catalog), context);
+  } else {
+    run('assets/js/backgrounds.js');
+    run('assets/js/background-selections.js');
+  }
   if (selectedSets) {
     const catalog = context.BACKGROUNDS.light.concat(context.BACKGROUNDS.dark);
     context.BACKGROUND_SELECTIONS = typeof selectedSets === 'function' ? selectedSets(catalog) : selectedSets;
@@ -117,6 +146,34 @@ const allSelected = entries => {
   const urls = entries.map(e => e.u);
   return { laptop: urls, mobile: urls };
 };
+
+test('the published layered SVG retains its selection and fallback geometry in both themes and device sets', () => {
+  const url = '/assets/images/skydiving.svg';
+  for (const theme of ['light', 'dark']) {
+    const b = browser({ catalog: null, theme });
+    assert.deepEqual(plain(b.api.all().map(e => e.u)), [url]);
+    assert.deepEqual(plain(b.api.selections()), { laptop: [url], mobile: [url] });
+    for (const [width, height] of [[1440, 900], [3440, 1440], [1024, 1024], [390, 844]]) {
+      b.resize(width, height);
+      b.emit('pageswap');
+      const pick = b.api.current();
+      assert.equal(pick.u, url);
+      assert.equal(pick.m, theme === 'dark' ? 'd' : 'l');
+      assert.equal(pick.v, 6);
+      assert.equal(pick.layered, true);
+      assert.equal(b.html.classList.contains('has-landscape'), true);
+      assert.equal(b.html.style.getPropertyValue('--bg-image'), `url("${url}")`);
+      const layout = b.api.layout(pick);
+      const scale = Math.min(width / pick.width, height / pick.height);
+      assert.equal(layout.width, pick.width * scale);
+      assert.equal(layout.height, pick.height * scale);
+      assert(layout.left >= 0 && layout.top >= 0);
+      const restored = browser({ catalog: null, theme, width, height, pick });
+      assert.equal(restored.api.current().u, url);
+      assert.equal(restored.html.style.getPropertyValue('--bg-image'), `url("${url}")`);
+    }
+  }
+});
 
 test('phones, laptops, desktops, square windows and ultrawides choose the closest photo shapes in both themes', () => {
   for (const [width, height, shape] of [[390, 844, 'portrait'], [844, 390, 'landscape'],
@@ -153,7 +210,7 @@ test('cached photos are revalidated, metadata refreshed, and legacy zoom discard
   const b = browser({ width: 390, height: 844, pick: { m: 'l', u: '/assets/backgrounds/light/thun_schlosssommer.jpg',
     c: 'wrong', w: 'old-wide.jpg', s: 116.5, y: 19.7 } });
   const p = b.api.current();
-  assert.equal(p.v, 3);
+  assert.equal(p.v, 6);
   assert.equal(p.c, b.api.all().find(e => e.u === p.u).edge.caps);
   assert.equal(p.device, 'mobile');
   assert(p.width > 0 && p.height > 0);
@@ -297,10 +354,6 @@ test('gallery previews keep the full photo and choose margin colors for the expo
     assert(b.html.style.getPropertyValue('--bg-image').includes(thun.u));
     assert.equal(Number(b.html.style.getPropertyValue('--photo-ratio')), thun.width / thun.height);
     assert.equal(Number(b.html.style.getPropertyValue('--photo-inverse')), thun.height / thun.width);
-    const seam = b.html.style.getPropertyValue('--photo-seam');
-    if (Math.abs(width / height - thun.width / thun.height) < 0.000001) assert.equal(seam, 'none');
-    else assert(seam.includes(width / height > thun.width / thun.height ? 'to right' : 'to bottom'),
-      'only the boundary adjoining a margin is softened');
     const layout = b.api.layout(thun);
     const scale = Math.min(width / thun.width, height / thun.height);
     const near = (actual, expected, description) => assert(Math.abs(actual - expected) < 0.001,
@@ -363,10 +416,9 @@ test('the Sossusvlei gallery card shows soft surroundings without altering the o
   assert.equal(entry.width, 1200);
   assert.equal(entry.height, 1600, 'the original has portrait orientation');
   assert(entry.extension);
-  assert(fs.existsSync(path.join(root, entry.extension.u)), 'the configured extension file exists');
   assert.equal(entry.extension.width, 1585);
   assert.equal(entry.extension.height, 992);
-  assert.equal(entries.filter(e => e.extension).length, 1, 'the trial affects only this photo');
+  assert.equal(entries.filter(e => e.extension).length, 1, 'other fixture photos have no extension');
   b.nav.children.find(e => e.className.includes('gallery-btn')).fire('click');
   const card = b.nodes.get('gallery-grid').children[entries.findIndex(e => e.u === url)];
   assert.equal(card.querySelector('figcaption').textContent, 'Sossusvlei · Soft extension');
@@ -476,6 +528,13 @@ test('all four pre-paint bootstraps restore only current geometry and never a te
     vm.runInContext(script, b.context);
     assert(b.html.style.getPropertyValue('--bg-image').includes(b.api.current().u));
     b.html.style.removeProperty('--bg-image');
+    const current = b.api.current();
+    for (const v of [3, 4, 5]) {
+      b.context.sessionStorage.setItem('bg', JSON.stringify({ ...current, v }));
+      vm.runInContext(script, b.context);
+      assert.equal(b.html.style.getPropertyValue('--bg-image'), '', 'previous schema is not restored before paint');
+    }
+    b.context.sessionStorage.setItem('bg', JSON.stringify(current));
     b.context.sessionStorage.setItem('bg', JSON.stringify({ ...b.api.current(), preview: true }));
     vm.runInContext(script, b.context);
     assert.equal(b.html.style.getPropertyValue('--bg-image'), '');
@@ -493,7 +552,7 @@ test('all four pre-paint bootstraps restore only current geometry and never a te
 test('cached outpainting is discarded and all page bootstraps restore the current photo and solid margin color', () => {
   const url = '/assets/backgrounds/light/thun_schlosssommer.jpg';
   const selectedSets = { laptop: [url], mobile: [url] };
-  const initial = browser({ selectedSets, pick: { v: 3, m: 'l', u: url, c: '#000000',
+  const initial = browser({ selectedSets, pick: { v: 5, m: 'l', u: url, c: '#000000',
     outpaint: { u: '/old-outpaint.png', width: 1586, height: 992 }, manual: true } });
   const pick = plain(initial.api.current());
   assert.equal(pick.u, url);
@@ -507,32 +566,12 @@ test('cached outpainting is discarded and all page bootstraps restore the curren
     assert(initial.html.style.getPropertyValue('--bg-image').includes(url));
     assert.equal(initial.html.style.getPropertyValue('--sky'), pick.c);
     assert.equal(Number(initial.html.style.getPropertyValue('--photo-ratio')), pick.width / pick.height);
-    assert(initial.html.style.getPropertyValue('--photo-seam').includes('to right'));
   }
   const reloaded = browser({ pick, selectedSets });
   assert.equal(reloaded.api.current().u, url);
   assert.equal(reloaded.html.classList.contains('has-outpaint'), false);
   assert.equal(reloaded.api.layout(reloaded.api.current()).height, 900);
   assert.equal(reloaded.api.layout(reloaded.api.current()).width, 675);
-});
-
-test('the renderer feathers only the contained photo boundary over the matching fill', () => {
-  const css = source('assets/css/style.css');
-  const fill = css.match(/body::before\s*\{([^}]+)\}/)[1];
-  const photo = css.match(/body::after\s*\{([^}]+)\}/)[1];
-  assert.match(fill, /var\(--sky/);
-  assert.match(fill, /var\(--bg-rows-left[^\n]+left[^\n]+50%\s+100%/);
-  assert.match(fill, /var\(--bg-rows-right[^\n]+right[^\n]+50%\s+100%/);
-  assert.doesNotMatch(fill, /--bg-image/);
-  assert.match(photo, /center\s*\/\s*contain\s+no-repeat/);
-  assert.match(photo, /mask-image:\s*var\(--photo-seam,\s*none\)/);
-  // The gradient is defined on html: its dependencies must resolve there,
-  // before inheritance. A width defined only on ::after invalidates the mask.
-  const rootStyle = source('assets/css/style.css').match(/:root\s*\{([^}]+)\}/)[1];
-  assert.match(rootStyle, /--photo-feather:\s*var\(--photo-blend-width,\s*12%\)/);
-  assert.doesNotMatch(photo, /filter:|cover|--bg-size|--bg-wide|outpaint/);
-  assert.match(css, /@media print[\s\S]*body::before,\s*body::after,/);
-  assert.match(source('assets/js/switcher.js'), /Math\.min\(W\s*\/\s*img\.naturalWidth,\s*H\s*\/\s*img\.naturalHeight\)/);
 });
 
 function deferredRows() {
@@ -565,6 +604,119 @@ function assertRowPair(b, pair) {
 function clearRowPair(b) {
   for (const side of ['left', 'right']) b.html.style.removeProperty('--bg-rows-' + side);
 }
+
+test('a reused generic photo URL only restores row samples from the current cache version', async () => {
+  const url = '/assets/backgrounds/light/thun_schlosssommer.jpg';
+  const selectedSets = { laptop: [url], mobile: [url] };
+  const initial = browser({ width: 3440, height: 1440, selectedSets });
+  const saved = plain(initial.api.current());
+  for (const v of [4, 5, 6]) {
+    const cached = rowPair('cached-version-' + v);
+    const rows = deferredRows();
+    const b = browser({ width: 3440, height: 1440, selectedSets,
+      pick: { ...saved, v, manual: true, rows: cached }, rowLoader: rows.get.bind(rows) });
+    assert.equal(b.api.current().u, saved.u, 'the selection survives an artwork cutover at the same URL');
+    assert.equal(b.api.current().manual, true);
+    assert.equal(b.api.current().v, 6);
+    assert.deepEqual(plain(b.api.selections()), plain(initial.api.selections()));
+    if (v !== 6) {
+      assertRowPair(b, null);
+      assert.equal(b.api.current().rows, undefined, 'old artwork samples never enter the new session');
+    } else {
+      assertRowPair(b, cached);
+      assert.deepEqual(plain(b.api.current().rows), cached, 'current samples are reusable before decoding');
+    }
+    const refreshed = rowPair('approved-artwork');
+    rows.pending.get(saved.u).resolve(refreshed);
+    await settleRows();
+    assertRowPair(b, refreshed);
+    assert.deepEqual(plain(b.api.current().rows), refreshed);
+  }
+});
+
+test('layered artwork never samples its full SVG or reuses cached row strips', () => {
+  const initial = browser({ catalog: null, width: 3440, height: 1440 });
+  const saved = plain(initial.api.current());
+  for (const v of [4, 5, 6]) {
+    const rows = deferredRows();
+    const b = browser({ catalog: null, width: 3440, height: 1440,
+      pick: { ...saved, v, manual: true, rows: rowPair('old-full-svg') },
+      rowLoader: rows.get.bind(rows) });
+    assert.equal(b.api.current().u, saved.u);
+    assert.equal(b.api.current().manual, true);
+    assert.equal(b.api.current().v, 6);
+    assert.equal(b.api.current().layered, true);
+    assert.equal(b.api.current().rows, undefined);
+    assertRowPair(b, null);
+    b.resize(390, 844);
+    b.resize(3440, 1440);
+    b.emit('pageswap');
+    assert.equal(rows.pending.size, 0, 'the full SVG never reaches the row loader');
+    assert.equal(b.html.classList.contains('has-landscape'), true);
+    assertRowPair(b, null);
+  }
+});
+
+test('switching to layered artwork clears photo rows and extensions and cancels pending samples', async () => {
+  const catalog = testCatalog();
+  const artwork = browser({ catalog: null }).api.all()[0];
+  const photo = catalog.light.find(e => e.extension);
+  const layered = { ...plain(artwork), extension: photo.extension };
+  catalog.light.push(layered);
+  const rows = deferredRows();
+  const b = browser({ catalog, selectedSets: { laptop: [photo.u], mobile: [photo.u] },
+    rowLoader: rows.get.bind(rows) });
+  assert.equal(b.api.current().layered, false);
+  assert.equal(b.html.classList.contains('has-extension'), true);
+  const cached = rowPair('visible-photo');
+  for (const side of ['left', 'right']) {
+    b.html.style.setProperty('--bg-rows-' + side, `url("${cached[side]}")`);
+  }
+  b.api.preview(layered);
+  assert.equal(b.html.classList.contains('has-landscape'), true);
+  assert.equal(b.html.classList.contains('has-extension'), false);
+  assert.equal(b.html.style.getPropertyValue('--bg-extension'), '');
+  assertRowPair(b, null);
+  const loaded = rowPair('late-photo');
+  rows.pending.get(photo.u).resolve(loaded);
+  await settleRows();
+  assertRowPair(b, null);
+  assert.equal(b.api.current().rows, undefined);
+  assert.equal(rows.pending.has(layered.u), false);
+  b.api.preview(photo);
+  await settleRows();
+  assert.equal(b.html.classList.contains('has-landscape'), false);
+  assert.equal(b.html.classList.contains('has-extension'), true);
+  assertRowPair(b, loaded);
+  assert.deepEqual(plain(b.api.current().rows), loaded);
+});
+
+test('prepaint enables layered artwork without cached rows and preserves generic photo rows', () => {
+  const b = browser({ catalog: null, width: 3440, height: 1440 });
+  const pick = plain(b.api.current());
+  const rows = rowPair('cached-full-svg');
+  for (const page of ['index.html', 'research.html', 'cv.html', '404.html']) {
+    const script = source(page).match(/<script>([\s\S]*?)<\/script>/)[1];
+    for (const layered of [true, false]) {
+      b.context.sessionStorage.setItem('bg', JSON.stringify({ ...pick, layered, rows }));
+      b.html.classList.remove('has-landscape');
+      clearRowPair(b);
+      vm.runInContext(script, b.context);
+      assert.equal(b.html.classList.contains('has-landscape'), layered);
+      assertRowPair(b, layered ? null : rows);
+      assert.equal(b.html.style.getPropertyValue('--bg-image'), `url("${pick.u}")`);
+      assert.equal(Number(b.html.style.getPropertyValue('--photo-ratio')), pick.width / pick.height);
+    }
+    const getItem = b.context.localStorage.getItem;
+    b.context.localStorage.getItem = () => { throw new Error('storage blocked'); };
+    b.html.classList.remove('has-landscape');
+    clearRowPair(b);
+    vm.runInContext(script, b.context);
+    assert.equal(b.html.classList.contains('has-landscape'), true, 'first paint is layered even without storage');
+    assertRowPair(b, null);
+    b.context.localStorage.getItem = getItem;
+  }
+});
 
 test('a late row pair cannot replace a newer gallery photo or change the good sets', async () => {
   const thun = '/assets/backgrounds/light/thun_schlosssommer.jpg';
@@ -657,7 +809,7 @@ test('legacy shared row colors are discarded and recomputed as independent sides
   const url = '/assets/backgrounds/light/thun_schlosssommer.jpg';
   const rows = deferredRows();
   const b = browser({ selectedSets: { laptop: [url], mobile: [url] }, rowLoader: rows.get.bind(rows),
-    pick: { v: 3, m: 'l', u: url, manual: true, rows: 'data:image/png;base64,bGVnYWN5' } });
+    pick: { v: 6, m: 'l', u: url, manual: true, rows: 'data:image/png;base64,bGVnYWN5' } });
   assertRowPair(b, null);
   assert.equal(b.api.current().rows, undefined);
   const pair = rowPair('replacement');

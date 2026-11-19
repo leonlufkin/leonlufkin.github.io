@@ -2,45 +2,21 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Bay watercolor — WebGL machinery demo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monterey Bay — layered low-poly SVG</title>
+  <link rel="preload" href="/assets/images/skydiving-sky.svg" as="image" type="image/svg+xml" fetchpriority="high">
+  <link rel="preload" href="/assets/images/skydiving-coast.svg" as="image" type="image/svg+xml" fetchpriority="high">
+  <link rel="preload" href="/assets/images/skydiving-diver.svg" as="image" type="image/svg+xml" fetchpriority="high">
+  <link rel="stylesheet" href="assets/css/style.css?v=56">
+  <script>document.documentElement.classList.add("has-landscape");</script>
+  <script src="assets/js/backgrounds.js?v=19" defer></script>
+  <script src="assets/js/landscape-gpu.js?v=1" defer></script>
+  <script src="assets/js/landscape.js?v=4" defer onerror="document.documentElement.classList.remove('has-landscape')"></script>
   <style>
-    html, body { margin: 0; height: 100%; background: #f5f3ee; }
-    #stage { position: relative; width: 100vw; height: 100vh; overflow: hidden;
-             --aspect: calc(2048 / 917); }
-    #stage > canvas { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-                      width: min(100vw, calc(100vh * var(--aspect)));
-                      height: min(100vh, calc(100vw / var(--aspect))); }
-    #label { position: fixed; left: 10px; bottom: 8px; font: 12px ui-monospace, monospace; color: #666; }
+    #label { position: fixed; left: 10px; bottom: 8px; font: 12px ui-monospace, monospace; color: #333; }
   </style>
 </head>
 <body>
-  <div id="stage">
-    <div id="label">Monterey Bay — watercolor planes (move the pointer)</div>
-  </div>
-  <script src="assets/js/kea/bay-body.js?v=7"></script>
-  <script src="assets/js/kea/bay-dive.js?v=16"></script>
-  <script>
-    const stage = document.getElementById('stage');
-    function layer(canvas) {
-      canvas.style.position = 'absolute';
-      canvas.style.left = '50%'; canvas.style.top = '50%';
-      canvas.style.transform = 'translate(-50%, -50%)';
-      canvas.style.width = 'min(100vw, calc(100vh * 2048 / 917))';
-      canvas.style.height = 'min(100vh, calc(100vw * 917 / 2048))';
-      stage.appendChild(canvas);
-    }
-    const label = document.getElementById('label');
-    const V = '?v=' + Date.now();   // dev: always fresh textures
-    const opts = {
-      planes: '/assets/images/kea/bay-planes.png' + V,
-      mask: '/assets/images/kea/bay-mask.png' + V,
-      meta: '/assets/images/kea/bay.json' + V,
-    };
-    const body = mountBayBody(stage, Object.assign({ onFail: e => label.textContent = 'body failed: ' + e }, opts));
-    layer(body.canvas);
-    const dive = mountBayDive(stage, Object.assign({ onFail: e => label.textContent = 'dive failed: ' + e }, opts));
-    layer(dive.canvas);
-    Promise.all([body.ready, dive.ready]).then(() => { label.textContent = 'Monterey Bay — watercolor planes (move the pointer)'; });
-  </script>
+  <div id="label">Monterey Bay — layered low-poly SVG</div>
 </body>
 </html>
