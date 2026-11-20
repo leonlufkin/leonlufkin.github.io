@@ -92,6 +92,8 @@ def main():
             os.remove(fp)
     if os.path.exists(os.path.join(ROOT, ".nojekyll")):
         shutil.copy(os.path.join(ROOT, ".nojekyll"), DIST)
+    # the offline cache worker has to sit at the site root to cover every page
+    shutil.copy(os.path.join(ROOT, "sw.js"), DIST)
     open(os.path.join(DIST, "robots.txt"), "w").write("User-agent: *\nDisallow: /\n")
 
     size = subprocess.run(["du", "-sh", DIST], capture_output=True, text=True).stdout.split()[0]

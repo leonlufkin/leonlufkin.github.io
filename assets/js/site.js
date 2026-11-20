@@ -8,12 +8,17 @@
    - All three pages are prefetched into memory at idle; clicking a site link
      swaps <header>/<main> in place — no document reload, no progress bar, no
      background repaint. Falls back to normal navigation on error.
+   - After a first visit the whole site is on the device: sw.js answers from a
+     cache and refreshes it in the background, so no tap and no later visit
+     waits on the connection.
    - This file loads deferred: nothing render-blocking. */
 
 (function () {
   var root = document.documentElement;
   var background = window.SiteBackground;
   var mq = matchMedia("(prefers-color-scheme: dark)");
+  // The local preview is where pages are edited: nothing may be served stale there.
+  var local = ["localhost", "127.0.0.1", "[::1]"].indexOf(location.hostname) !== -1;
 
   function emit(type) {
     try { window.dispatchEvent(new Event(type)); } catch (e) {}
@@ -137,7 +142,7 @@
       if (!options && pageCache[p]) return;
       fetch(u, options)
         .then(function (r) { return r.ok ? r.text() : Promise.reject(r.status); })
-        .then(function (t) { pageCache[p] = t; })
+        .then(function (t) { pageCache[p] = t; warmPage(p); })
         .catch(function () {});
     });
   }
@@ -146,7 +151,7 @@
   // edited on disk would never be picked up while the tab stays open.
   // Revalidate it whenever the tab becomes visible again; swaps keep using the
   // cached copy until the fresh one has landed.
-  if (["localhost", "127.0.0.1", "[::1]"].indexOf(location.hostname) !== -1) {
+  if (local) {
     var revalidatePages = function () { loadPages({ cache: "no-cache" }); };
     document.addEventListener("visibilitychange", function () {
       if (!document.hidden) revalidatePages();
@@ -233,13 +238,115 @@
   // Fetch the other pages at idle, so a first click swaps without the network.
   whenIdle(function () { loadPages(); }, 2000);
 
-  // While the bay is showing, fetch the moon too, so a first switch to dark mode
-  // is instant — but only after the page has loaded everything it shows now.
-  function warmPhoto() {
-    if (!background.dark() && !(navigator.connection && navigator.connection.saveData)) {
-      new Image().src = background.photo;
-    }
+  /* --- The whole site on the device --------------------------------------
+     sw.js answers every request from a cache on the device and refreshes that
+     cache in the background. A first visit still has to fetch what it shows;
+     after it, nothing waits on the connection — not a tap, not the next visit.
+     Not in the local preview, where an edit must show at once. */
+
+  var offline = "serviceWorker" in navigator && !local;
+  var interacted = false, settled = false, warmed = {};
+  ["pointerdown", "keydown", "wheel", "touchstart"].forEach(function (type) {
+    window.addEventListener(type, function () { interacted = true; }, { capture: true, passive: true });
+  });
+
+  // Reload at most once in a while, whatever the server keeps sending.
+  function reloadOnce() {
+    try {
+      if (Date.now() - (+sessionStorage.getItem("reloaded") || 0) < 15000) return;
+      sessionStorage.setItem("reloaded", String(Date.now()));
+    } catch (e) { return; }
+    location.reload();
   }
-  if (document.readyState === "complete") whenIdle(warmPhoto, 4000);
-  else window.addEventListener("load", function () { whenIdle(warmPhoto, 4000); }, { once: true });
+
+  if (offline) {
+    navigator.serviceWorker.register("/sw.js").catch(function () {});
+    // A page that was just served from the cache has changed on the server.
+    navigator.serviceWorker.addEventListener("message", function (e) {
+      var data = e.data || {};
+      if (data.type !== "page-updated") return;
+      var path = norm(data.path);
+      delete pageCache[path];
+      loadPages(); // later swaps get the new copy
+      // The page on screen: show the new one, unless the visitor is already using this one.
+      if (path === norm(location.pathname) && !interacted) reloadOnce();
+    });
+  }
+
+  function saving() {
+    return navigator.connection && navigator.connection.saveData;
+  }
+
+  // Hand the worker every address this visit has fetched, and the rest of the
+  // site; it stores the ones it lacks. This is what puts a first visit on the
+  // device: it loads before the worker is in control, and not every later
+  // fetch reaches the worker (WebKit keeps font loads from a page it took over).
+  function store() {
+    if (!offline) return;
+    navigator.serviceWorker.ready.then(function (registration) {
+      if (!registration.active) return;
+      var used = performance.getEntriesByType("resource").map(function (entry) { return entry.name; });
+      registration.active.postMessage({ type: "store", urls: ["/", location.pathname].concat(
+        PAGES.map(function (page) { return "/" + page; }), saving() ? [] : background.layers(background.density()), used) });
+    }).catch(function () {});
+  }
+
+  // Fetch what another page shows, so swapping to it needs no network. Only
+  // once this page has everything it shows itself.
+  // - Pictures: each is rebuilt as a detached <picture> in this document,
+  //   sources first and the image's own address last, so the browser fetches
+  //   the one candidate it would pick on that page.
+  // - Type: a page with accented names needs the font file for that range.
+  function warmPage(path) {
+    if (!settled || warmed[path] || !pageCache[path] || saving()) return;
+    var kept = warmed[path] = [];
+    prepare(pageCache[path]).then(function (html) {
+      var page = new DOMParser().parseFromString(html, "text/html"), images = page.querySelectorAll("img"), fetched = [];
+      if (document.fonts && document.fonts.load && page.body) {
+        fetched.push(document.fonts.load('1em "Latin Modern Roman"', page.body.textContent).catch(function () {}));
+      }
+      for (var i = 0; i < images.length; i++) {
+        var frame = images[i].closest("picture"), sources = frame ? frame.querySelectorAll("source") : [];
+        var picture = document.createElement("picture"), image = document.createElement("img");
+        fetched.push(new Promise(function (done) { image.onload = image.onerror = done; }));
+        for (var j = 0; j < sources.length; j++) picture.appendChild(document.importNode(sources[j], true));
+        picture.appendChild(image);
+        for (var k = 0, names = ["sizes", "srcset", "src"]; k < names.length; k++) {
+          if (images[i].hasAttribute(names[k])) image.setAttribute(names[k], images[i].getAttribute(names[k]));
+        }
+        kept.push(picture);
+      }
+      if (fetched.length) return Promise.all(fetched).then(store);
+    }).catch(function () {});
+  }
+
+  // Fetch what the rest of the site shows: the other theme's background, the
+  // other pages' pictures and type.
+  function warmSite() {
+    settled = true;
+    if (!saving() && !background.dark()) {
+      var moon = new Image();
+      moon.onload = store;
+      moon.src = background.photo;
+    }
+    Object.keys(pageCache).forEach(warmPage);
+    store();
+  }
+
+  // Start once the page has loaded everything it shows now and, on a first
+  // visit, once the worker is in control: what is fetched from then on lands
+  // in its cache. A worker that never takes over must not hold this back.
+  function settle() {
+    var begun = false;
+    function begin() {
+      if (begun) return;
+      begun = true;
+      whenIdle(warmSite, 4000);
+    }
+    if (!offline || navigator.serviceWorker.controller) { begin(); return; }
+    navigator.serviceWorker.addEventListener("controllerchange", begin);
+    setTimeout(begin, 5000);
+  }
+  if (document.readyState === "complete") settle();
+  else window.addEventListener("load", settle, { once: true });
 })();

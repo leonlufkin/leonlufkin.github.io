@@ -44,12 +44,14 @@ function element(tag) {
 
 // A browser window showing `page`, with the page's bootstrap already run.
 function browser({ page = 'index.html', width = 1440, height = 900, ratio = 2, system = 'light', stored,
-  hostname = 'leonlufkin.github.io', storageFails = false } = {}) {
+  hostname = 'leonlufkin.github.io', storageFails = false, worker = false, controlled = true } = {}) {
   const html = element('html'), head = element('head'), body = element('body');
   const windowListeners = new Map(), documentListeners = new Map(), mediaListeners = [];
   const frames = [], idle = [], requests = [], images = [];
+  const registrations = [], workerListeners = new Map(), posted = [], session = new Map(), pictures = [];
+  const fetched = ['https://' + hostname + '/assets/css/style.css?v=1'];
   const storage = new Map(stored ? [['theme', stored]] : []);
-  let nav, box;
+  let nav, box, reloads = 0;
 
   function mountPage(name) {
     if (nav) nav.remove();
@@ -73,7 +75,8 @@ function browser({ page = 'index.html', width = 1440, height = 900, ratio = 2, s
   const context = {
     innerWidth: width, innerHeight: height, devicePixelRatio: ratio,
     document: { documentElement: html, head, body, hidden: false,
-      createElement: element,
+      createElement(tag) { const made = element(tag); if (tag === 'picture') pictures.push(made); return made; },
+      importNode: node => { const copy = element(node.tagName); copy.setAttribute('srcset', node.getAttribute('srcset')); return copy; },
       querySelector: selector => selector === 'nav' ? nav : body.querySelector(selector),
       querySelectorAll: selector => body.querySelectorAll(selector),
       addEventListener(type, fn) { documentListeners.set(type, (documentListeners.get(type) || []).concat(fn)); } },
@@ -90,18 +93,39 @@ function browser({ page = 'index.html', width = 1440, height = 900, ratio = 2, s
     requestAnimationFrame(fn) { frames.push(fn); return frames.length; },
     requestIdleCallback(fn) { idle.push(fn); },
     setTimeout(fn) { idle.push(fn); },
-    history: {}, navigator: {}, scrollTo() {},
+    history: {}, scrollTo() {},
+    navigator: worker ? { serviceWorker: {
+      controller: controlled ? {} : null,
+      register(url) { registrations.push(url); return Promise.resolve(); },
+      addEventListener(type, fn) { workerListeners.set(type, (workerListeners.get(type) || []).concat(fn)); },
+      ready: Promise.resolve({ active: { postMessage(message) { posted.push(message); } } }) } } : {},
+    sessionStorage: { getItem: k => session.has(k) ? session.get(k) : null, setItem: (k, v) => { session.set(k, String(v)); } },
+    performance: { getEntriesByType: () => fetched.map(name => ({ name })) },
     location: { hostname, origin: 'https://' + hostname, pathname: '/' + (page === 'index.html' ? '' : page),
-      href: 'https://' + hostname + '/' + (page === 'index.html' ? '' : page) },
-    fetch(url, options) { requests.push({ url, options }); return Promise.resolve({ ok: true, text: () => Promise.resolve('') }); },
+      href: 'https://' + hostname + '/' + (page === 'index.html' ? '' : page), reload() { reloads++; } },
+    // The home page is the one with a picture: the headshot, as WebP with a JPEG fallback.
+    fetch(url, options) { requests.push({ url, options });
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(url === 'index.html' ? '<picture>headshot</picture>' : '<main></main>') }); },
+    DOMParser: class { parseFromString(text) {
+      const source = element('source'); source.setAttribute('srcset', 'headshot.webp 2x');
+      const frame = element('picture'); frame.appendChild(source);
+      const image = frame.appendChild(element('img')); image.setAttribute('src', 'headshot.jpg');
+      image.closest = () => frame;
+      return { querySelectorAll: () => text.includes('<picture>') ? [image] : [] }; } },
     atob: text => Buffer.from(text, 'base64').toString('latin1'), URL, console,
   };
   context.window = context;
   vm.createContext(context);
   vm.runInContext(bootstrapOf(page), context, { filename: page });
 
-  const b = { context, html, head, requests, images,
-    get nav() { return nav; }, get box() { return box; },
+  const b = { context, html, head, requests, images, registrations, posted, fetched,
+    // The warmed pictures finish downloading.
+    loadPictures() { pictures.forEach(p => p.children.forEach(c => c.onload && c.onload())); },
+    get nav() { return nav; }, get box() { return box; }, get reloads() { return reloads; },
+    // What each warmed picture would make the browser fetch: its sources, then the image's own address.
+    pictures: () => pictures.map(p => p.children.map(c => c.tagName + ':' + (c.getAttribute('srcset') || c.getAttribute('src')))),
+    workerEvent(type, event = {}) { (workerListeners.get(type) || []).forEach(fn => fn(event)); },
+    workerMessage(data) { b.workerEvent('message', { data }); },
     get themeButton() { return nav.querySelector('.theme-toggle'); },
     theme: () => storage.has('theme') ? storage.get('theme') : null,
     loadSite() { vm.runInContext(source('assets/js/site.js'), context, { filename: 'site.js' }); return b; },
