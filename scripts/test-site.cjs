@@ -329,3 +329,98 @@ test('while the bay is showing, the moon is fetched once the page has loaded, fo
   dark.emit('load'); dark.runIdle();
   assert.deepEqual(dark.images, [], 'already on screen in dark mode');
 });
+
+const settle = () => new Promise(resolve => setImmediate(resolve));
+
+test('the offline worker is registered on the deployed site, never in the local preview', () => {
+  assert.deepEqual(browser({ worker: true }).loadSite().registrations, ['/sw.js']);
+  for (const hostname of ['localhost', '127.0.0.1', '[::1]']) {
+    assert.deepEqual(browser({ worker: true, hostname }).loadSite().registrations, [], hostname);
+  }
+});
+
+test('the worker is handed the whole site to keep on the device: what the page used, then what was fetched for later', async () => {
+  const b = browser({ page: 'research.html', worker: true }).loadSite();
+  await settle();
+  assert.deepEqual(b.posted, [], 'not while the page is still loading what it shows');
+  b.emit('load'); b.runIdle();
+  await settle();
+  assert.equal(b.posted.length, 1);
+  assert.equal(b.posted[0].type, 'store');
+  for (const url of ['/', '/index.html', '/research.html', '/cv.html', '/assets/images/skydiving-sky-2x.webp',
+    'https://leonlufkin.github.io/assets/css/style.css?v=1']) {
+    assert(b.posted[0].urls.includes(url), url);
+  }
+
+  // The other theme's background and the home page's picture arrive: each is handed over, however the browser fetched it.
+  const moon = 'https://leonlufkin.github.io' + MOON, headshot = 'https://leonlufkin.github.io/headshot.webp';
+  b.fetched.push(moon);
+  b.images[0].onload();
+  await settle();
+  assert.equal(b.posted.length, 2);
+  assert(b.posted[1].urls.includes(moon));
+  b.fetched.push(headshot);
+  b.loadPictures();
+  await settle();
+  assert.equal(b.posted.length, 3);
+  assert(b.posted[2].urls.includes(headshot));
+});
+
+test('a page that changed on the server replaces the cached one on screen, once, unless the visitor is already using it', async () => {
+  const idle = browser({ worker: true }).loadSite();
+  idle.runIdle();
+  await settle();
+  idle.requests.length = 0;
+  idle.workerMessage({ type: 'page-updated', path: '/cv.html' });
+  assert.equal(idle.reloads, 0, 'another page changing does not disturb this one');
+  assert.deepEqual(idle.requests.map(r => r.url), ['cv.html'], 'but its new copy is fetched for the next swap');
+  idle.workerMessage({ type: 'page-updated', path: '/index.html' });
+  assert.equal(idle.reloads, 1);
+  idle.workerMessage({ type: 'page-updated', path: '/' });
+  assert.equal(idle.reloads, 1, 'never in a loop');
+
+  const busy = browser({ worker: true }).loadSite();
+  busy.emit('pointerdown');
+  busy.workerMessage({ type: 'page-updated', path: '/' });
+  assert.equal(busy.reloads, 0);
+});
+
+test('the pictures of the other pages are fetched too, but only once this page has loaded what it shows', async () => {
+  const headshot = [['SOURCE:headshot.webp 2x', 'IMG:headshot.jpg']]; // the fallback offered inside its <picture>, never alone
+
+  // The other pages arrive before this one has finished loading…
+  const early = browser({ page: 'research.html' }).loadSite();
+  early.runIdle();
+  await settle();
+  assert.deepEqual(early.pictures(), [], 'nothing competes with the page still loading');
+  early.emit('load'); early.runIdle();
+  await settle();
+  assert.deepEqual(early.pictures(), headshot);
+
+  // …or only after it.
+  const late = browser({ page: 'research.html', worker: true }).loadSite();
+  late.emit('load'); late.runIdle();
+  await settle();
+  assert.deepEqual(late.pictures(), headshot);
+  late.workerMessage({ type: 'page-updated', path: '/index.html' }); // its page is fetched again
+  await settle();
+  assert.deepEqual(late.pictures(), headshot, 'each page once');
+});
+
+test('on a first visit the rest of the site is fetched once the worker is in control, so it lands in its cache', async () => {
+  const b = browser({ worker: true, controlled: false }).loadSite();
+  b.emit('load');
+  await settle();
+  assert.deepEqual(b.images, [], 'not before the worker can keep what is fetched');
+  b.workerEvent('controllerchange'); b.runIdle();
+  await settle();
+  assert.deepEqual(b.images.map(image => image.src), [MOON]);
+  assert.equal(b.posted.length, 1);
+
+  // A worker that never takes over does not hold the rest of the site back for good.
+  const stuck = browser({ worker: true, controlled: false }).loadSite();
+  stuck.emit('load');
+  stuck.runIdle(); stuck.runIdle(); // the fallback timer, then the idle task it schedules
+  await settle();
+  assert.deepEqual(stuck.images.map(image => image.src), [MOON]);
+});
