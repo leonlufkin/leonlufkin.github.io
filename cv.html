@@ -6,66 +6,69 @@
   <title>CV · Leon Lufkin</title>
   <meta name="description" content="Curriculum vitae of Leon Lufkin.">
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-  <link rel="preload" href="assets/fonts/lmroman-regular.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="assets/css/style.css?v=62">
-  <link rel="stylesheet" href="assets/css/gallery.css?v=1">
-  <link rel="prefetch" href="index.html">
-  <link rel="prefetch" href="research.html">
-  <script src="assets/js/background-defaults.js?v=2"></script>
-  <script>/* Prepaint the theme/device default or a compatible explicit session choice. */
+  <script>/* Pre-paint: theme, background and its preloads. Identical on every page. */
 (function () {
-  var root = document.documentElement, theme = null, pick = null;
-  try { theme = localStorage.getItem("theme"); } catch (e) {}
-  if (theme !== "light" && theme !== "dark") theme = null;
-  if (theme) root.classList.add(theme);
-  var mode = theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-  var defaults = window.SiteBackgroundDefaults;
-  var fallback = defaults.get(mode), landscape = defaults.get("light");
-  var ratio = Math.max(1, innerWidth) / Math.max(1, innerHeight);
-  try { pick = JSON.parse(sessionStorage.getItem("bg") || "null"); } catch (e) {}
-  var compatible = pick && !pick.preview && pick.m === mode.charAt(0) &&
-    typeof pick.u === "string" && /^\/assets\/(?:backgrounds\/[^"\\\s]+\.jpg|images\/skydiving\.svg)$/.test(pick.u) &&
-    Number.isFinite(pick.width) && pick.width > 0 && Number.isFinite(pick.height) && pick.height > 0 &&
-    (pick.manual === true || pick.v === defaults.version &&
-      (pick.default === true ? pick.u === fallback.u :
-        pick.default === false && pick.viewport === ratio && pick.device === defaults.device()));
-  if (!compatible) pick = fallback;
-  var layered = pick.u === landscape.u && !!landscape.layered;
-  root.classList.toggle("has-landscape", layered);
-  root.style.setProperty("--bg-image", 'url("' + pick.u + '")');
-  var aspect = pick.width / pick.height;
-  var axis = ratio >= aspect ? "sides" : "caps";
-  root.style.setProperty("--sky", pick.edge && pick.edge[axis] || pick.c);
-  root.style.setProperty("--photo-ratio", String(aspect));
-  root.style.setProperty("--photo-inverse", String(1 / aspect));
-  var direction = layered || Math.abs(ratio - aspect) < 0.000001 ? null : ratio > aspect ? "right" : "bottom";
-  root.style.setProperty("--photo-seam", direction
-    ? "linear-gradient(to " + direction + ", transparent, #000 var(--photo-feather), #000 calc(100% - var(--photo-feather)), transparent)"
-    : "none");
-  var validRows = !layered && !pick.subject && ratio > aspect && pick.v === defaults.version && pick.rows &&
-    ["left", "right"].every(function (side) {
-      return typeof pick.rows[side] === "string" && pick.rows[side].indexOf("data:image/png;base64,") === 0;
+  var root = document.documentElement;
+  // Light theme: the layered Monterey Bay scene (drawn by landscape.js).
+  // Dark theme: the moon photograph. Nothing here depends on the page.
+  var scene = { width: 1721, height: 771, minHeight: 933, edge: { sides: "#72bcf6", caps: "#9bd4fb" } };
+  var moon = { u: "/assets/backgrounds/dark/home_moon2.jpg", width: 1600, height: 1200,
+    edge: { sides: "#010101", caps: "#010102" }, subject: { x: 445, y: 200, width: 819, height: 810 } };
+  function stored() {
+    try { var t = localStorage.getItem("theme"); return t === "light" || t === "dark" ? t : null; }
+    catch (e) { return null; }
+  }
+  function dark() {
+    var t = stored();
+    return t ? t === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  }
+  // The scene's layers come as 1x and 2x bitmaps of its source frame.
+  function density() {
+    var scale = Math.min(innerWidth / scene.width, innerHeight / scene.minHeight);
+    return scale * Math.min(window.devicePixelRatio || 1, 2) > 1.1 ? 2 : 1;
+  }
+  function layers(set) {
+    return ["sky", "coast", "diver"].map(function (name) {
+      return "/assets/images/skydiving-" + name + "-" + set + "x.webp";
     });
-  ["left", "right"].forEach(function (side) {
-    root.style.removeProperty("--bg-rows-" + side);
-    if (validRows) {
-      root.style.setProperty("--bg-rows-" + side, 'url("' + pick.rows[side] + '")');
-    }
-  });
-  if (layered) (landscape.preload || []).forEach(function (url) {
+  }
+  function apply() {
+    var theme = stored(), night = dark(), e = night ? moon : scene, style = root.style;
+    var aspect = e.width / e.height, wide = Math.max(1, innerWidth) / Math.max(1, innerHeight) >= aspect;
+    root.classList.toggle("dark", theme === "dark");
+    root.classList.toggle("light", theme === "light");
+    root.classList.toggle("has-landscape", !night);
+    root.classList.toggle("has-photo", night);
+    style.setProperty("--sky", e.edge[wide ? "sides" : "caps"]);
+    if (!night) return;
+    style.setProperty("--bg-image", 'url("' + moon.u + '")');
+    style.setProperty("--photo-ratio", String(aspect));
+    style.setProperty("--photo-inverse", String(1 / aspect));
+    style.setProperty("--photo-seam", "linear-gradient(to " + (wide ? "right" : "bottom") +
+      ", transparent, #000 var(--photo-feather), #000 calc(100% - var(--photo-feather)), transparent)");
+    // Hold the moon's disc on the center of the viewport.
+    style.setProperty("--photo-shift-x", String(0.5 - (moon.subject.x + moon.subject.width / 2) / moon.width));
+    style.setProperty("--photo-shift-y", String(0.5 - (moon.subject.y + moon.subject.height / 2) / moon.height));
+  }
+  window.SiteBackground = { apply: apply, dark: dark, density: density, layers: layers, photo: moon.u };
+  apply();
+  (dark() ? [moon.u] : layers(density())).forEach(function (url) {
     var link = document.createElement("link");
     link.rel = "preload"; link.as = "image"; link.href = url;
     document.head.appendChild(link);
   });
 })();</script>
-  <script src="assets/js/backgrounds.js?v=21" defer></script>
+  <link rel="preload" href="assets/fonts/lmroman-regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/lmroman-bold.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/lmroman-italic.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="assets/css/style.css?v=63">
+  <link rel="prefetch" href="index.html">
+  <link rel="prefetch" href="research.html">
   <script src="assets/js/gate.js?v=1" defer></script>
-  <script src="assets/js/background-selections.js?v=2" defer></script>
-  <script src="assets/js/background-rows.js?v=3" defer></script>
-  <script src="assets/js/site.js?v=27" defer></script>
-  <script src="assets/js/landscape-gpu.js?v=1" defer></script>
-  <script src="assets/js/landscape.js?v=5" defer></script>
-  <script src="assets/js/gallery.js?v=6" defer></script>
+  <script src="assets/js/site.js?v=28" defer></script>
+  <script src="assets/js/landscape-scene.js?v=1" defer></script>
+  <script src="assets/js/landscape-gpu.js?v=2" defer></script>
+  <script src="assets/js/landscape.js?v=6" defer></script>
 </head>
 
 <body>
@@ -78,7 +81,7 @@
         <span class="theme-icon theme-icon-sun" aria-hidden="true">☀︎</span>
         <span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span>
       </button>
-      <button type="button" class="theme-toggle gallery-btn" aria-label="Photo gallery" aria-controls="gallery" aria-expanded="false">
+      <button type="button" class="reveal-toggle" aria-label="Hide page text" aria-pressed="false">
         <span class="theme-icon" aria-hidden="true">▦</span>
       </button>
     </nav>
@@ -87,10 +90,10 @@
   <main>
     <div class="cv-printhead print-only">
       <h1>Leon Lufkin</h1>
-      <p>lufkin@stanford.edu, leon@zyphra.com &middot; leonlufkin.github.io</p>
+      <p><span class="email-rev" data-email="bHVma2luQHN0YW5mb3JkLmVkdQ==">ude.drofnats<span class="at"></span>nikful</span>, <span class="email-rev" data-email="bGVvbkB6eXBocmEuY29t">moc.arhpyz<span class="at"></span>noel</span> &middot; leonlufkin.github.io</p>
     </div>
     <h1 class="screen-only">Curriculum Vitae</h1>
-    <p class="cv-contact screen-only"><a href="mailto:lufkin@stanford.edu">lufkin@stanford.edu</a> &middot; <a href="mailto:leon@zyphra.com">leon@zyphra.com</a> &middot; <a href="assets/cv.pdf" class="pdf-link">PDF</a></p>
+    <p class="cv-contact screen-only"><a class="email-rev" data-email="bHVma2luQHN0YW5mb3JkLmVkdQ==">ude.drofnats<span class="at"></span>nikful</a> &middot; <a class="email-rev" data-email="bGVvbkB6eXBocmEuY29t">moc.arhpyz<span class="at"></span>noel</a> &middot; <a href="assets/cv.pdf" class="pdf-link">PDF</a></p>
 
     <h2>Education</h2>
     <div class="cv-item">

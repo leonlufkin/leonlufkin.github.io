@@ -1,4 +1,4 @@
-/* One retained GPU scene; the original SVG images remain the rasterization masters. */
+/* One retained GPU scene, composited from the landscape's layer bitmaps. */
 (function () {
   "use strict";
 
@@ -96,7 +96,7 @@
     "void main() { gl_FragColor = texture2D(u_image, v_uv); }"
   ].join("\n");
 
-  function create(canvas, onContextLost) {
+  function create(canvas, onFailure) {
     var gl;
     try {
       gl = canvas.getContext("webgl", {
@@ -110,8 +110,8 @@
     var shaders = [], programs = [], textures = [], buffer = null;
     var background, imageProgram, scratch, ctx;
     var maxTexture, maxWidth, maxHeight;
-    var disposed = false, lost = false, broken = false, ready = false;
-    var active = null, sourceImages = null, previous = null, layerScale = 0;
+    var disposed = false, lost = false, broken = false, ready = false, errorTimer = 0;
+    var active = null, sourceImages = null, previous = null, layerScales = [0, 0, 0];
     var boundaryBytes = new Uint8Array(65 * 4);
     var paletteBytes = new Uint8Array(65 * 8 * 4);
     var layerTextures = [];
@@ -120,6 +120,7 @@
     function destroy() {
       if (disposed) return;
       disposed = true;
+      clearTimeout(errorTimer);
       canvas.removeEventListener("webglcontextlost", contextLost);
       for (var i = 0; i < textures.length; i++) gl.deleteTexture(textures[i]);
       for (var j = 0; j < programs.length; j++) gl.deleteProgram(programs[j]);
@@ -135,7 +136,20 @@
       if (disposed || lost) return;
       lost = true;
       ready = false;
-      if (onContextLost) onContextLost();
+      if (onFailure) onFailure();
+    }
+    // gl.getError() blocks until the GPU has finished every pending upload, so it
+    // is asked shortly after the frame instead of inside it. A failed upload
+    // (out of memory on a small GPU) then hands the scene to the 2D fallback.
+    function checkUploads() {
+      if (errorTimer) return;
+      errorTimer = setTimeout(function () {
+        errorTimer = 0;
+        if (disposed || lost || broken || gl.getError() === gl.NO_ERROR) return;
+        broken = true;
+        ready = false;
+        if (onFailure) onFailure();
+      }, 300);
     }
     function compile(type, source) {
       var shader = gl.createShader(type);
@@ -238,16 +252,17 @@
           area += piece.width * piece.height;
           limit = Math.min(limit, maxTexture / piece.width, maxTexture / piece.height);
         }
-        // Quarter-source-pixel steps avoid rerasterizing SVGs for every small refinement.
+        // Quarter-source-pixel steps avoid redrawing the layers for every small refinement.
         var scale = Math.min(Math.ceil(g.scale * outputRatio(g) * 4) / 4,
           Math.sqrt(PIXEL_LIMIT / area), limit);
-        if (changed || scale > layerScale) {
-          for (var j = 0; j < 3; j++) {
-            var layer = entry.layers[names[j]];
-            upload(layerTextures[j], raster(images[j], Math.max(1, Math.floor(layer.width * scale)),
-              Math.max(1, Math.floor(layer.height * scale))));
-          }
-          layerScale = scale;
+        for (var j = 0; j < 3; j++) {
+          var layer = entry.layers[names[j]];
+          // A layer is never drawn above its bitmap's own resolution; the GPU scales it from there.
+          var layerScale = Math.min(scale, images[j].naturalWidth / layer.width);
+          if (!changed && layerScale <= layerScales[j]) continue;
+          upload(layerTextures[j], raster(images[j], Math.max(1, Math.floor(layer.width * layerScale)),
+            Math.max(1, Math.floor(layer.height * layerScale))));
+          layerScales[j] = layerScale;
         }
         if (changed) uploadPalettes(entry, edgePalettes);
         var fillScale = Math.min(1, maxTexture / fillCanvas.width, maxTexture / fillCanvas.height,
@@ -256,7 +271,8 @@
           Math.max(1, Math.floor(fillCanvas.width * fillScale)),
           Math.max(1, Math.floor(fillCanvas.height * fillScale))) : fillCanvas;
         upload(fillTexture, source);
-        if (gl.getError() !== gl.NO_ERROR || gl.isContextLost()) { broken = true; return false; }
+        if (gl.isContextLost()) { broken = true; return false; }
+        checkUploads();
         active = entry;
         if (changed) sourceImages = [images[0], images[1], images[2]];
         previous = { W: g.W, H: g.H, left: g.left, width: g.width, scale: g.scale, spare: g.spare };
@@ -327,7 +343,7 @@
       boundaryTexture = texture();
       paletteTexture = texture();
       for (var i = 0; i < 3; i++) layerTextures.push(texture());
-      // Both SVG/canvas uploads and texture UVs start at the top left. All color pixels are premultiplied.
+      // Both image/canvas uploads and texture UVs start at the top left. All color pixels are premultiplied.
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
       gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
       gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);

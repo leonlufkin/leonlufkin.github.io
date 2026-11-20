@@ -2,14 +2,25 @@
    Light/dark follows the system preference (overridable via the toggle). */
 
 /* Latin Modern — Knuth's Computer Modern as OpenType (GUST, GUST Font License):
-   the genuine LaTeX face, self-hosted and subset to Latin. font-display: swap
-   means it never blocks first paint; Georgia is the fallback until it loads. */
+   the genuine LaTeX face, self-hosted. Each style comes in two files: the
+   characters the pages use every day, and the rest of the Latin range, which
+   unicode-range fetches only when a page needs it. font-display: swap means
+   neither blocks first paint; Georgia is the fallback until they load. */
 @font-face {
   font-family: "Latin Modern Roman";
   font-style: normal;
   font-weight: 400;
   font-display: swap;
   src: url("../fonts/lmroman-regular.woff2") format("woff2");
+  unicode-range: U+0020-007E, U+00A0, U+00B7, U+2013-2014, U+2018-2019, U+201C-201D, U+2026, U+2212;
+}
+@font-face {
+  font-family: "Latin Modern Roman";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/lmroman-regular-ext.woff2") format("woff2");
+  unicode-range: U+00A1-00B6, U+00B8-017F, U+2000-2012, U+2015-2017, U+201A-201B, U+201E-2025, U+2027-206F;
 }
 @font-face {
   font-family: "Latin Modern Roman";
@@ -17,6 +28,15 @@
   font-weight: 400;
   font-display: swap;
   src: url("../fonts/lmroman-italic.woff2") format("woff2");
+  unicode-range: U+0020-007E, U+00A0, U+00B7, U+2013-2014, U+2018-2019, U+201C-201D, U+2026, U+2212;
+}
+@font-face {
+  font-family: "Latin Modern Roman";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/lmroman-italic-ext.woff2") format("woff2");
+  unicode-range: U+00A1-00B6, U+00B8-017F, U+2000-2012, U+2015-2017, U+201A-201B, U+201E-2025, U+2027-206F;
 }
 @font-face {
   font-family: "Latin Modern Roman";
@@ -24,6 +44,15 @@
   font-weight: 700;
   font-display: swap;
   src: url("../fonts/lmroman-bold.woff2") format("woff2");
+  unicode-range: U+0020-007E, U+00A0, U+00B7, U+2013-2014, U+2018-2019, U+201C-201D, U+2026, U+2212;
+}
+@font-face {
+  font-family: "Latin Modern Roman";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/lmroman-bold-ext.woff2") format("woff2");
+  unicode-range: U+00A1-00B6, U+00B8-017F, U+2000-2012, U+2015-2017, U+201A-201B, U+201E-2025, U+2027-206F;
 }
 @font-face {
   font-family: "Latin Modern Roman";
@@ -31,6 +60,15 @@
   font-weight: 700;
   font-display: swap;
   src: url("../fonts/lmroman-bolditalic.woff2") format("woff2");
+  unicode-range: U+0020-007E, U+00A0, U+00B7, U+2013-2014, U+2018-2019, U+201C-201D, U+2026, U+2212;
+}
+@font-face {
+  font-family: "Latin Modern Roman";
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/lmroman-bolditalic-ext.woff2") format("woff2");
+  unicode-range: U+00A1-00B6, U+00B8-017F, U+2000-2012, U+2015-2017, U+201A-201B, U+201E-2025, U+2027-206F;
 }
 
 /* Metric-matched fallback: local Georgia adjusted to Latin Modern's metrics,
@@ -45,8 +83,8 @@
 }
 
 :root {
-  /* --photo-seam is defined here by site.js, so its width dependency must
-     resolve here too, before the computed gradient is inherited by ::after. */
+  /* --photo-seam is defined here by the page bootstrap, so its width dependency
+     must resolve here too, before the computed gradient is inherited by ::after. */
   --photo-feather: var(--photo-blend-width, 12%);
   --bg: #ffffff;
   --text: #1a1a1a;
@@ -55,7 +93,7 @@
   --accent: #0645ad;
   --accent-soft: #dce6f5;
   --wash: rgba(255, 255, 255, 0.63);
-  --sky: #8aa3c9; /* sampled from the photo's own sky; fills width beyond the image */
+  --sky: #72bcf6; /* flat fill behind the background; the bootstrap matches it to the artwork's edge */
 }
 
 /* Dark palette applies when forced via the toggle (html.dark), or — for the
@@ -68,6 +106,7 @@
   --accent: #8cb4ff;
   --accent-soft: #1c2c4a;
   --wash: rgba(14, 14, 14, 0.65);
+  --sky: #010101;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -79,6 +118,7 @@
     --accent: #8cb4ff;
     --accent-soft: #1c2c4a;
     --wash: rgba(14, 14, 14, 0.65);
+    --sky: #010101;
   }
 }
 
@@ -94,46 +134,46 @@ html {
   display: none;
 }
 
-/* Fill and photo share the same wash. Feather only the photo's boundary.
-   Subject-aware photos retain contain scale and can shift into the solid fill. */
+/* The background is fixed to the viewport and depends on the theme alone: the
+   layered Monterey Bay scene in light mode, the moon in dark mode. Both are
+   sized from vw and the large viewport height, so page content, scrollbars and
+   mobile browser bars never move them.
+
+   A wash of the page color lies over the flat fill and over the photo, so the
+   photo's feathered boundary melts into the fill. */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: -4;
   pointer-events: none;
-  background:
-    linear-gradient(var(--wash), var(--wash)),
-    var(--bg-rows-left, none) left / 50% 100% no-repeat,
-    var(--bg-rows-right, none) right / 50% 100% no-repeat var(--sky);
+  background: linear-gradient(var(--wash), var(--wash)), var(--sky);
 }
 
-body::after {
+/* The moon, shown whole (contain scale) with its disc on the viewport's center. */
+.has-photo body::after {
   content: "";
   position: fixed;
-  left: calc(50% + var(--photo-offset-x, 0px));
-  top: calc(50% + var(--photo-offset-y, 0px));
-  transform: translate(-50%, -50%);
-  width: min(100vw, calc(100vh * var(--photo-ratio, 0.75)));
-  height: min(100vh, calc(100vw * var(--photo-inverse, 1.3333333333333333)));
-  width: min(100vw, calc(100dvh * var(--photo-ratio, 0.75)));
-  height: min(100dvh, calc(100vw * var(--photo-inverse, 1.3333333333333333)));
+  left: 50vw;
+  top: 50vh;
+  width: min(100vw, calc(100vh * var(--photo-ratio)));
+  height: min(100vh, calc(100vw * var(--photo-inverse)));
+  transform: translate(calc(-50% + var(--photo-shift-x, 0) * 100%), calc(-50% + var(--photo-shift-y, 0) * 100%));
   z-index: -2;
   pointer-events: none;
   background:
     linear-gradient(var(--wash), var(--wash)),
-    var(--bg-image, url("../images/background-web.jpg")) center / contain no-repeat;
+    var(--bg-image) center / contain no-repeat;
   -webkit-mask-image: var(--photo-seam, none);
   mask-image: var(--photo-seam, none);
 }
 
-/* The layered scene owns its visible pixels; photos keep their wash and seam. */
-.has-landscape body::after { content: none; }
+/* The layered scene owns its visible pixels and takes a lighter wash. */
 :root.has-landscape:not(.dark) { --wash: rgba(255, 255, 255, 0.25); }
 @media (prefers-color-scheme: dark) {
   :root.has-landscape:not(.light) { --wash: rgba(14, 14, 14, 0.65); }
 }
-/* The stage stays laid out while hidden so the scene can be prepared behind a photo. */
+/* The stage stays laid out while hidden so the scene can be prepared behind the moon. */
 #landscape-stage {
   visibility: hidden;
   position: fixed;
@@ -142,7 +182,6 @@ body::after {
   left: 0;
   width: 100vw;
   height: 100vh;
-  height: 100dvh;
   overflow: hidden;
   pointer-events: none;
   contain: layout paint;
@@ -158,28 +197,17 @@ body::after {
 }
 .landscape-gpu { display: none; }
 .has-gpu .landscape-gpu { display: block; }
-.has-gpu .landscape-fill,
-.landscape-piece { display: none; }
+.has-gpu .landscape-fill { display: none; }
 
-/* Quiet generated surroundings stay behind the sharp original photograph.
-   Blur is applied to this layer itself, as well as feathering the photo seam. */
-#bg-extension { display: none; }
-.has-extension #bg-extension {
-  display: block;
-  position: fixed;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: var(--extension-width);
-  height: var(--extension-height);
-  z-index: -3;
-  pointer-events: none;
-  background: linear-gradient(var(--wash), var(--wash)),
-    var(--bg-extension) center / 100% 100% no-repeat;
-  filter: blur(8px);
-  mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent),
-    linear-gradient(to bottom, transparent, #000 3%, #000 97%, transparent);
-  mask-composite: intersect;
+/* Where the browser's bars come and go, hold both backgrounds to the largest
+   viewport: they then stay put while the bars slide over them. */
+@supports (height: 100lvh) {
+  .has-photo body::after {
+    top: 50lvh;
+    width: min(100vw, calc(100lvh * var(--photo-ratio)));
+    height: min(100lvh, calc(100vw * var(--photo-inverse)));
+  }
+  #landscape-stage { height: 100lvh; }
 }
 
 body {
@@ -242,9 +270,10 @@ nav a[aria-current="page"] {
   font-weight: 700;
 }
 
-/* Initial-markup theme and gallery controls ------------------------------ */
+/* Initial-markup controls: theme, and the grid that lifts the text box ------- */
 
-.theme-toggle {
+.theme-toggle,
+.reveal-toggle {
   padding: 0;
   border: none;
   background: none;
@@ -267,6 +296,25 @@ nav a[aria-current="page"] {
 @media (prefers-color-scheme: dark) {
   :root:not(.light) .theme-icon-sun { display: block; }
   :root:not(.light) .theme-icon-moon { display: none; }
+}
+
+/* The grid button hides the page's text box so the background shows whole. */
+.intro,
+body:not(.home) main {
+  transition: opacity 0.2s ease, visibility 0.2s;
+}
+
+:root.content-hidden .intro,
+:root.content-hidden body:not(.home) main {
+  opacity: 0;
+  visibility: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .intro,
+  body:not(.home) main {
+    transition: none;
+  }
 }
 
 /* Headings --------------------------------------------------------------- */
@@ -417,11 +465,29 @@ body.home main {
   color: var(--muted);
 }
 
+.page-links {
+  margin: 0 0 0.35rem;
+  color: var(--muted);
+}
+
 /* CV --------------------------------------------------------------------- */
 
 .cv-contact {
   margin: -0.7rem 0 0;
   color: var(--muted);
+}
+
+/* E-mail addresses sit in the markup reversed and without their "@", so a
+   harvester reading the HTML finds no address. These rules show them the right
+   way round until site.js swaps in the real text and link. */
+.email-rev {
+  unicode-bidi: bidi-override;
+  unicode-bidi: isolate-override; /* neighbouring addresses keep their order */
+  direction: rtl;
+}
+
+.email-rev .at::before {
+  content: "@";
 }
 
 .cv-item {
@@ -578,12 +644,12 @@ body.home main {
   /* strip everything that isn't the CV text */
   body::before,
   body::after,
-  #bg-extension,
   #landscape-stage,
   main::before,
   header,
   nav,
   .theme-toggle,
+  .reveal-toggle,
   #style-switcher,
   .screen-only {
     display: none !important;
@@ -674,12 +740,15 @@ body.home main {
     margin-right: 0.45em;
   }
 
-  /* belt-and-suspenders: never print a box on any page */
+  /* belt-and-suspenders: never print a box on any page, and always print the text */
   .intro,
   body:not(.home) main {
     border: none !important;
     background: none !important;
     box-shadow: none !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    transition: none !important;
   }
 
   .intro::before,

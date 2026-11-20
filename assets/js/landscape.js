@@ -1,10 +1,13 @@
-/* One composited scene: GPU resizing, with a cached Canvas2D fallback. */
+/* The light theme's background: one composited scene of three bitmap layers,
+   with GPU resizing and a cached Canvas2D fallback. */
 (function () {
   "use strict";
   var root = document.documentElement;
-  var stage, fill, images = [], active = null, failed = null, geometry = null;
+  var scene = window.LandscapeScene, background = window.SiteBackground;
+  var stage, fill, images = [], geometry = null;
   var observer, frame = 0, triangleCount = 0, edgePalettes;
-  var loaded = null, loadVersion = 0;
+  // Density set (1 or 2) of the layer bitmaps: on screen, and asked for.
+  var loaded = 0, requested = 0, failed = false, loadVersion = 0;
   var refineTimer = 0;
   var texture, textureGeometry = null;
   var gpu, gpuCanvas, fallbackLayers = null, fallbackScale = 0;
@@ -37,8 +40,8 @@
     });
   }
   function sideBend(x, g, side) {
-    var p = active.layers.boundary.sky, n = p.length - 1;
-    var slope = side === "left" ? (p[1] - p[0]) * n / active.width : (p[n] - p[n - 1]) * n / active.width;
+    var p = scene.layers.boundary.sky, n = p.length - 1;
+    var slope = side === "left" ? (p[1] - p[0]) * n / scene.width : (p[n] - p[n - 1]) * n / scene.width;
     var edge = side === "left" ? g.left : g.left + g.width;
     return clamp(slope * (x - edge), -g.H * 0.2, g.H * 0.2);
   }
@@ -52,7 +55,9 @@
     canvas.width = 750; canvas.height = 58;
     var ctx = canvas.getContext("2d");
     // Copy the photographed thin cloud above the horizon, including its original facet detail.
-    ctx.drawImage(image, 430, 44, canvas.width, canvas.height, 0, 0, canvas.width, canvas.height);
+    // The rectangle is in source pixels; the bitmap may hold more than one pixel for each.
+    var k = image.naturalWidth / scene.layers.sky.width;
+    ctx.drawImage(image, 430 * k, 44 * k, canvas.width * k, canvas.height * k, 0, 0, canvas.width, canvas.height);
     var pixels = ctx.getImageData(0, 0, canvas.width, canvas.height), data = pixels.data;
     for (var x = 0; x < canvas.width; x++) {
       var top = 0, bottom = 0;
@@ -75,7 +80,7 @@
   }
   function paintClouds(ctx, g) {
     if (!cloud) return;
-    var boundary = active.layers.boundary;
+    var boundary = scene.layers.boundary;
     ctx.save();
     cloudCopies.forEach(function (copy) {
       var sky = sample(boundary.sky, copy.x) * g.scale;
@@ -88,7 +93,7 @@
     ctx.restore();
   }
   function colorAt(x, y, g) {
-    var m = active.layers, u = clamp((x - g.left) / g.width, 0, 1);
+    var m = scene.layers, u = clamp((x - g.left) / g.width, 0, 1);
     var side = x < g.left ? "left" : x > g.left + g.width ? "right" : null;
     if (side) {
       // Continue the cloud arcs into side margins instead of extruding horizontal stripes.
@@ -102,7 +107,7 @@
     var sky = sample(m.boundary.sky, u) * g.scale;
     var coast = sample(m.boundary.coast, u) * g.scale + g.spare;
     if (side && (y <= sky || y >= coast)) {
-      var position = (y <= sky ? y : y - g.spare) / g.scale / active.height;
+      var position = (y <= sky ? y : y - g.spare) / g.scale / scene.height;
       var distance = side === "left" ? g.left - x : x - g.left - g.width;
       return mix(sample(m.colors[side], position), sample(edgePalettes[side], position),
         smooth(distance / Math.max(24, 64 * g.scale)));
@@ -148,8 +153,8 @@
         v -= 0.04 * Math.sin(2 * Math.PI * v);
         var x = rect.x + u * rect.w, y;
         if (rect.gap) {
-          var top = sample(active.layers.boundary.sky, u) * g.scale - 1;
-          var bottom = sample(active.layers.boundary.coast, u) * g.scale + g.spare + 1;
+          var top = sample(scene.layers.boundary.sky, u) * g.scale - 1;
+          var bottom = sample(scene.layers.boundary.coast, u) * g.scale + g.spare + 1;
           // Irregular rows and diagonals flow along the photographed horizon arcs.
           var bow = -Math.min(28 * g.scale, rect.h / 10) * Math.sin(Math.PI * u) * Math.sin(Math.PI * v);
           y = top + v * (bottom - top) + bow;
@@ -186,7 +191,7 @@
       return;
     }
     // Reproject cached gap pixels between the actual curved boundaries, not the whole viewport.
-    var boundary = active.layers.boundary, strips = 256;
+    var boundary = scene.layers.boundary, strips = 256;
     var rx = texture.width / previous.W, ry = texture.height / previous.H;
     for (var i = 0; i < strips; i++) {
       var u = (i + 0.5) / strips;
@@ -215,7 +220,7 @@
     var ctx = texture.getContext("2d");
     ctx.setTransform(texture.width / g.W, 0, 0, texture.height / g.H, 0, 0);
     ctx.lineWidth = 1; ctx.lineJoin = "round";
-    var boundary = active.layers.boundary, gap = 0;
+    var boundary = scene.layers.boundary, gap = 0;
     for (var k = 0; k < boundary.sky.length; k++) gap = Math.max(gap, g.spare + (boundary.coast[k] - boundary.sky[k]) * g.scale);
     var rects = [{ x: g.left, w: g.width, h: gap + 2, gap: true }];
     if (g.left > 0.1) {
@@ -245,7 +250,7 @@
   function prepareFallbackLayers(g) {
     var area = 0, limit = Infinity;
     names.forEach(function (name) {
-      var p = active.layers[name];
+      var p = scene.layers[name];
       area += p.width * p.height;
       limit = Math.min(limit, 4096 / p.width, 4096 / p.height);
     });
@@ -253,9 +258,11 @@
       Math.max(0.25, Math.pow(2, Math.ceil(Math.log2(g.scale * texture.width / g.W)))));
     if (fallbackLayers && fallbackScale >= scale) return;
     fallbackLayers = images.map(function (image, i) {
-      var p = active.layers[names[i]], canvas = document.createElement("canvas");
-      canvas.width = Math.max(1, Math.floor(p.width * scale));
-      canvas.height = Math.max(1, Math.floor(p.height * scale));
+      var p = scene.layers[names[i]], canvas = document.createElement("canvas");
+      // Never above the bitmap's own resolution; drawing it larger adds no detail.
+      var layerScale = Math.min(scale, image.naturalWidth / p.width);
+      canvas.width = Math.max(1, Math.floor(p.width * layerScale));
+      canvas.height = Math.max(1, Math.floor(p.height * layerScale));
       canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
       return canvas;
     });
@@ -264,7 +271,7 @@
   function drawScene(g, refined) {
     if (gpu) {
       var renderer = gpu;
-      if ((!refined || renderer.update(active, images, texture, g, edgePalettes)) && renderer.render(g)) {
+      if ((!refined || renderer.update(scene, images, texture, g, edgePalettes)) && renderer.render(g)) {
         stage.classList.add("has-gpu");
         stage.dataset.renderer = "webgl";
         return;
@@ -288,25 +295,28 @@
   }
   function refineFill() {
     refineTimer = 0;
-    if (!geometry || loaded !== active || !active) return;
+    if (!geometry || !loaded) return;
     paintFill(geometry);
     announceGeometry();
   }
   function layout() {
     frame = 0;
-    if (!active || loaded !== active || failed === active) return;
+    if (failed) { root.classList.remove("has-landscape"); return; }
+    if (!loaded) return;
     // A hidden prepared frame waits for its reveal instead of following every resize.
     if (geometry && !visible()) return;
     var W = stage.clientWidth, H = stage.clientHeight, ratio = window.devicePixelRatio || 1;
     if (!W || !H || geometry && geometry.W === W && geometry.H === H && geometry.ratio === ratio) return;
-    var m = active.layers;
+    // A window that has outgrown the loaded bitmaps gets the sharper set, swapped in once decoded.
+    prepare(background.density());
+    var m = scene.layers;
     // Fill the window width unless the three real image pieces would collide.
     var minimumHeight = m.sky.y + m.sky.height + m.coast.height + m.diver.height + 24;
-    var scale = Math.min(W / active.width, H / minimumHeight);
-    var width = active.width * scale, left = (W - width) / 2;
-    var spare = Math.max(0, H - active.height * scale);
+    var scale = Math.min(W / scene.width, H / minimumHeight);
+    var width = scene.width * scale, left = (W - width) / 2;
+    var spare = Math.max(0, H - scene.height * scale);
     var g = { W: W, H: H, ratio: ratio, width: width, left: left, scale: scale, spare: spare, boxes: [] };
-    names.forEach(function (name, i) {
+    names.forEach(function (name) {
       var p = m[name], y = p.y * scale;
       if (name === "coast") y += spare;
       if (name === "diver") y = ((m.sky.y + m.sky.height) * scale + H - m.coast.height * scale - p.height * scale) / 2;
@@ -335,85 +345,68 @@
     gpuCanvas.className = "landscape-gpu";
     stage.appendChild(gpuCanvas);
     gpu = window.SiteLandscapeGPU ? window.SiteLandscapeGPU.create(gpuCanvas, disableGPU) : null;
-    names.forEach(function (name) {
-      var image = document.createElement("img");
-      image.className = "landscape-piece landscape-" + name;
-      image.alt = ""; image.draggable = false; image.decoding = "async"; image.fetchPriority = "high";
-      stage.appendChild(image); images.push(image);
-    });
+    edgePalettes = { left: softenEdge(scene.layers.colors.left), right: softenEdge(scene.layers.colors.right) };
     document.body.appendChild(stage);
     observer = new ResizeObserver(scheduleLayout); observer.observe(stage);
   }
-  // Load, decode and composite one entry. Safe to call repeatedly: a prepared
-  // entry (or one still in flight) is reused rather than restarted.
-  function prepare(entry) {
+  // Load and decode one density set of the layers, then composite it. A set
+  // already loaded or in flight is reused; a sharper one takes over only once
+  // every layer has decoded, so one complete frame replaces another.
+  function prepare(set) {
+    if (failed || set <= requested) return;
     if (!stage) mount();
-    if (active === entry) return;
-    clearTimeout(refineTimer); refineTimer = 0;
-    active = entry; loaded = null; geometry = null; cloud = null;
-    fallbackLayers = null; fallbackScale = 0;
+    requested = set;
     var version = ++loadVersion;
-    stage.classList.remove("is-ready");
-    edgePalettes = { left: softenEdge(entry.layers.colors.left), right: softenEdge(entry.layers.colors.right) };
-    names.forEach(function (name, i) {
-      images[i].fetchPriority = visible() ? "high" : "low";
-      images[i].src = entry.layers[name].u;
+    var next = background.layers(set).map(function (url) {
+      var image = new Image();
+      image.decoding = "async";
+      image.fetchPriority = visible() ? "high" : "low";
+      image.src = url;
+      return image;
     });
-    // Reveal one complete frame, not three independently decoded pieces and two fill paints.
-    Promise.all(images.map(function (image) { return image.decode(); })).then(function () {
-      if (active !== entry || version !== loadVersion) return;
-      cloud = copyCloud(images[0]);
-      loaded = entry;
+    Promise.all(next.map(function (image) { return image.decode(); })).then(function () {
+      if (version !== loadVersion) return;
+      var nextCloud = copyCloud(next[0]);
+      images = next; cloud = nextCloud; loaded = set;
+      fallbackLayers = null; fallbackScale = 0;
+      geometry = null;
       scheduleLayout();
     }).catch(function () {
-      if (active !== entry || version !== loadVersion) return;
-      failed = entry; loaded = null;
+      if (version !== loadVersion) return;
+      if (loaded) { requested = loaded; return; } // keep the set already on screen
+      failed = true;
       stage.classList.remove("is-ready");
       root.classList.remove("has-landscape");
     });
   }
-  function catalog() {
-    return window.SiteBackgrounds ? window.SiteBackgrounds.all() : (window.BACKGROUNDS || {}).light || [];
-  }
+  // Show the scene in the light theme. In the dark theme a prepared scene is
+  // kept: the next switch back reveals it without reloading.
   function sync() {
-    var list = catalog();
-    var current = window.SiteBackgrounds && window.SiteBackgrounds.current();
-    var entry = current ? list.find(function (e) { return e.u === current.u; }) : list[0];
-    if (!entry || !entry.layers || failed === entry) {
-      // Keep the prepared scene: the next switch back reveals it without reloading.
-      root.classList.remove("has-landscape"); return;
-    }
-    root.classList.add("has-landscape");
-    prepare(entry);
+    if (!visible()) return;
+    if (failed) { root.classList.remove("has-landscape"); return; }
+    prepare(background.density());
     layout();
   }
-  // While a photo is showing, prepare the light default in the background so
-  // the first switch reveals a finished frame. Deferred past load and idle so
-  // it never competes with the page's own resources.
+  // While the moon is showing, prepare the scene in the background so the first
+  // switch to light reveals a finished frame. Deferred past load and idle so it
+  // never competes with the page's own resources.
   function warm() {
-    var defaults = window.SiteBackgroundDefaults;
-    if (active || !defaults || (navigator.connection && navigator.connection.saveData)) return;
-    var url = defaults.get("light").u;
-    var entry = catalog().find(function (e) { return e.u === url && e.layers; });
-    if (entry && failed !== entry) prepare(entry);
+    if (requested || (navigator.connection && navigator.connection.saveData)) return;
+    prepare(background.density());
   }
   function scheduleWarm() {
     if ("requestIdleCallback" in window) requestIdleCallback(warm, { timeout: 4000 });
     else setTimeout(warm, 1000);
   }
   // Blend samples the same complete scene that is presented on screen.
-  async function sampleRect(rect) {
-    var entry = active;
-    if (!entry || !geometry || !root.classList.contains("has-landscape")) return null;
-    try { await Promise.all(images.map(function (image) { return image.decode(); })); }
-    catch (e) { return null; }
-    if (active !== entry || failed === entry) return null;
+  function sampleRect(rect) {
+    if (!geometry || !visible()) return Promise.resolve(null);
     var g = geometry, x = Math.max(0, rect.left), y = Math.max(0, rect.top);
     var w = Math.min(g.W, rect.right) - x, h = Math.min(g.H, rect.bottom) - y;
-    if (w <= 0 || h <= 0) return null;
+    if (w <= 0 || h <= 0) return Promise.resolve(null);
     var canvas = document.createElement("canvas"); canvas.width = canvas.height = 32;
     var ctx = canvas.getContext("2d");
-    ctx.fillStyle = entry.c; ctx.fillRect(0, 0, 32, 32);
+    ctx.fillStyle = scene.c; ctx.fillRect(0, 0, 32, 32);
     ctx.setTransform(32 / w, 0, 0, 32 / h, -x * 32 / w, -y * 32 / h);
     var surface = gpu ? gpuCanvas : fill;
     ctx.drawImage(surface, 0, 0, surface.width, surface.height, 0, 0, g.W, g.H);
@@ -421,12 +414,11 @@
     for (var i = 0; i < pixels.length; i += 4) {
       sum[0] += pixels[i]; sum[1] += pixels[i + 1]; sum[2] += pixels[i + 2];
     }
-    return sum.map(function (v) { return v / 1024; });
+    return Promise.resolve(sum.map(function (v) { return v / 1024; }));
   }
   window.SiteLandscape = { sample: sampleRect };
   window.addEventListener("resize", scheduleLayout);
-  window.addEventListener("backgroundchange", sync);
-  window.addEventListener("backgroundgeometrychange", scheduleLayout);
+  window.addEventListener("themechange", sync);
   sync();
   if (document.readyState === "complete") scheduleWarm();
   else window.addEventListener("load", scheduleWarm, { once: true });

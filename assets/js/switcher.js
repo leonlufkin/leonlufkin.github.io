@@ -88,22 +88,6 @@
     ["Round", "18px"],
   ];
 
-  // Explicit image choices use the full catalog, independently of Random's
-  // curated, themed, geometry-filtered pool. Persist URLs, never list indices.
-  function bgList() {
-    var pool = window.SiteBackgrounds ? window.SiteBackgrounds.all() : [];
-    return [["Random", null]].concat(pool.map(function (e) {
-      return [e.layers ? e.l : e.u.split("/").pop().replace(/\.(jpg|svg)$/, ""), e];
-    }));
-  }
-
-  function imageIndex(list, url) {
-    for (var i = 1; i < list.length; i++) {
-      if (list[i][1].u === url) return i;
-    }
-    return 0;
-  }
-
   var ROWS = [
     { key: "f", label: "Font", list: FONTS },
     { key: "z", label: "Size", list: SIZES.map(function (s) { return [s]; }) },
@@ -112,45 +96,17 @@
     { key: "n", label: "Color", list: COLORS },
     { key: "o", label: "Opacity", list: OPACS },
     { key: "c", label: "Corners", list: CORNERS },
-    { key: "i", label: "Image", list: bgList },
   ];
-
-  function rowList(r) {
-    return typeof r.list === "function" ? r.list() : r.list;
-  }
 
   // Defaults mirror the styles baked into style.css (Georgia; hairline boxes
   // are baked in, so "Site default" applies no inline override).
   // Theme is handled by the site's real toggle (site.js), not the picker.
-  var DEFAULTS = { f: 0, z: 1, l: 0, k: 0, n: 0, o: 0, c: 0, i: 0, b: 12, min: 0 };
+  var DEFAULTS = { f: 0, z: 1, l: 0, k: 0, n: 0, o: 0, c: 0, b: 12, min: 0 };
   var s;
   // v5 key: ignore state saved before Line/Fill/Color became independent rows
   try { s = JSON.parse(localStorage.getItem("stylePreview-v9")) || {}; } catch (e) { s = {}; }
   for (var k in DEFAULTS) { if (typeof s[k] !== "number") s[k] = DEFAULTS[k]; }
   s.b = Number.isFinite(s.b) ? Math.max(0, Math.min(40, s.b)) : 12;
-
-  // Resolve the old index in its ORIGINAL unfiltered list exactly once.
-  // An incompatible legacy choice is discarded, never reinterpreted as a
-  // different image at the same index in the newly filtered list.
-  if (!Object.prototype.hasOwnProperty.call(s, "imageUrl")) {
-    var oldPool = (window.BACKGROUNDS || {})[effectiveDark() ? "dark" : "light"] || [];
-    oldPool = oldPool.filter(function (e) { return !e.layers; });
-    var oldPick = s.i > 0 && oldPool[s.i - 1];
-    s.imageUrl = oldPick ? oldPick.u : null;
-  }
-  if (typeof s.imageUrl !== "string") s.imageUrl = null;
-  if (s.imageMode && s.imageMode !== (effectiveDark() ? "dark" : "light")) s.imageUrl = null;
-  var initialList = bgList();
-  var initialIndex = imageIndex(initialList, s.imageUrl);
-  if (!initialIndex) s.imageUrl = null;
-  if (initialIndex && window.SiteBackgrounds) {
-    var currentPick = window.SiteBackgrounds.current();
-    // A tab's manual choice or current-policy Random beats an older panel
-    // preference. Untagged legacy explicit preferences migrate once.
-    if (!currentPick || currentPick.default) {
-      window.SiteBackgrounds.choose(initialList[initialIndex][1]);
-    }
-  }
 
   var css = document.createElement("style");
   css.textContent =
@@ -217,13 +173,12 @@
     return document.querySelector(".intro") || document.querySelector("main");
   }
 
-  // Blend samples the visible scene, never a second complete landscape SVG.
+  // Blend samples the visible scene.
   var lastSampleKey = null, sampleRequest = 0;
   function sampleBehindBox(t) {
     var cs = getComputedStyle(root);
     var bgi = (root.style.getPropertyValue("--bg-image") || "").trim();
-    var url = bgi ? bgi.slice(bgi.indexOf('("') + 2, bgi.lastIndexOf('")'))
-                  : "/assets/images/background-web.jpg";
+    var url = bgi ? bgi.slice(bgi.indexOf('("') + 2, bgi.lastIndexOf('")')) : null;
     var layered = window.SiteLandscape && root.classList.contains("has-landscape");
     var r = t.getBoundingClientRect();
     var key = [url, !!layered, Math.round(r.left), Math.round(r.top), Math.round(r.width),
@@ -253,12 +208,15 @@
       return;
     }
 
+    if (!url) { finish(null, true); return; }
     var img = new Image();
     img.onload = function () {
       var W = innerWidth, H = innerHeight;
       var sc = Math.min(W / img.naturalWidth, H / img.naturalHeight);
       var dispW = img.naturalWidth * sc, dispH = img.naturalHeight * sc;
-      var left = (W - dispW) / 2, top = (H - dispH) / 2;
+      // The photo's subject is held on the viewport's center (see --photo-shift-*).
+      var left = (W - dispW) / 2 + (parseFloat(root.style.getPropertyValue("--photo-shift-x")) || 0) * dispW;
+      var top = (H - dispH) / 2 + (parseFloat(root.style.getPropertyValue("--photo-shift-y")) || 0) * dispH;
 
       var x0 = Math.max(r.left, left), x1 = Math.min(r.right, left + dispW);
       var y0 = Math.max(r.top, top), y1 = Math.min(r.bottom, top + dispH);
@@ -295,29 +253,10 @@
     scheduleSample();
   });
 
-  function effectiveDark() {
-    if (root.classList.contains("dark")) return true;
-    if (root.classList.contains("light")) return false;
-    return mqDark.matches;
-  }
-
   function apply() {
     applyPhotoBlend();
     document.body.style.fontFamily = FONTS[s.f][1];
     document.body.style.fontSize = SIZES[s.z];
-
-    var bgs = bgList();
-    var current = window.SiteBackgrounds && window.SiteBackgrounds.current();
-    if (current && current.manual) {
-      s.imageUrl = current.u;
-      s.imageMode = effectiveDark() ? "dark" : "light";
-    } else if (current) {
-      s.imageUrl = null;
-      s.imageMode = null;
-    }
-    s.i = imageIndex(bgs, s.imageUrl);
-    if (!s.i) s.imageUrl = null;
-    // Applying typography/fill settings must never replace a gallery choice.
 
     var t = target();
     if (t) {
@@ -359,8 +298,8 @@
     }
 
     ROWS.forEach(function (r) {
-      var list = rowList(r), i = s[r.key] % list.length, n = list.length;
-      var label = r.key === "i" && i === 0 && current && current.default ? "Theme default" : list[i][0];
+      var list = r.list, i = s[r.key] % list.length, n = list.length;
+      var label = list[i][0];
       document.getElementById("sw-v-" + r.key).innerHTML =
         label + " <small>" + (i + 1) + "/" + n + "</small>";
     });
@@ -376,20 +315,8 @@
     if (!k) return;
     var row = ROWS.filter(function (r) { return r.key === k; })[0];
     if (!row) return;
-    if (k === "i") {
-      // Reconcile first if the gallery or a resize changed the current photo.
-      apply();
-    }
-    var n = rowList(row).length;
+    var n = row.list.length;
     s[k] = (s[k] + n + +e.target.getAttribute("data-d")) % n;
-    if (k === "i") {
-      var pick = bgList()[s.i][1];
-      s.imageUrl = pick ? pick.u : null;
-      if (window.SiteBackgrounds) {
-        if (pick) window.SiteBackgrounds.choose(pick);
-        else window.SiteBackgrounds.roll(true);
-      }
-    }
     apply();
   });
 
@@ -405,8 +332,6 @@
   if (mqDark.addEventListener) mqDark.addEventListener("change", apply);
   window.addEventListener("themechange", apply); // real toggle (site.js) flipped
   window.addEventListener("pageswap", apply); // instant nav replaced <main>
-  window.addEventListener("backgroundgeometrychange", apply);
-  window.addEventListener("backgroundchange", apply);
 
   apply();
 })();

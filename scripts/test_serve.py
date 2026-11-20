@@ -1,8 +1,8 @@
-"""Behavioral tests for compressed SVG delivery and preview editor isolation."""
+"""Behavioral tests for the preview server's compressed SVG delivery."""
 import functools
 import gzip
 import http.client
-import json
+import http.server
 import os
 from pathlib import Path
 import tempfile
@@ -14,9 +14,9 @@ import serve
 
 
 class ServerTestCase(unittest.TestCase):
-    def start_server(self, directory, **options):
+    def start_server(self, directory):
         handler = functools.partial(serve.Handler, directory=str(directory))
-        server = serve.PreviewServer(("127.0.0.1", 0), handler, **options)
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
         server.daemon_threads = False
         self.addCleanup(server.server_close)
         thread = threading.Thread(
@@ -48,7 +48,7 @@ class SvgDeliveryTests(ServerTestCase):
         cache = mock.patch.dict(serve.SVG_CACHE, clear=True)
         cache.start()
         self.addCleanup(cache.stop)
-        self.server, self.connection = self.start_server(temporary.name, read_only=True)
+        self.server, self.connection = self.start_server(temporary.name)
 
     def request(self, encoding="gzip", method="GET", headers=None):
         request_headers = {"Accept-Encoding": encoding}
@@ -159,108 +159,6 @@ class SvgDeliveryTests(ServerTestCase):
             identity, identity_body = self.request("identity")
             self.assert_svg_headers(identity, len(updated))
             self.assertEqual(identity_body, updated)
-
-
-class EditorModeTests(ServerTestCase):
-    def setUp(self):
-        temporary = tempfile.TemporaryDirectory()
-        self.addCleanup(temporary.cleanup)
-        self.root = Path(temporary.name)
-        scripts = self.root / "assets/js"
-        scripts.mkdir(parents=True)
-        (scripts / "backgrounds.js").write_text(
-            'window.BACKGROUNDS = [\n'
-            '{"u":"/first.jpg"},\n'
-            '{"u":"/second.jpg"}\n'
-            '];\n', encoding="utf-8"
-        )
-        self.selection = self.root / serve.SELECTION_PATH
-        self.initial = {"laptop": ["/first.jpg"], "mobile": ["/first.jpg"]}
-        self.updated = {"laptop": ["/second.jpg"], "mobile": ["/second.jpg"]}
-        self.selection.write_text(
-            "window.BACKGROUND_SELECTIONS = " + json.dumps(self.initial) + ";\n",
-            encoding="utf-8"
-        )
-        self.original_bytes = self.selection.read_bytes()
-        self.html = b"<!doctype html><title>Preview</title>"
-        (self.root / "index.html").write_bytes(self.html)
-        # Both modes coexist in one process and directory: neither may set a
-        # process-wide mode that changes the other server's editor behavior.
-        self.readonly_server, self.readonly = self.start_server(self.root, read_only=True)
-        self.editable_server, self.editable = self.start_server(self.root)
-
-    @staticmethod
-    def request(connection, method, path=serve.API_PATH, body=None, headers=None):
-        connection.request(method, path, body=body, headers=headers or {})
-        response = connection.getresponse()
-        return response, response.read()
-
-    def put(self, connection, headers=None):
-        request_headers = {"Content-Type": "application/json"}
-        request_headers.update(headers or {})
-        return self.request(
-            connection, "PUT", body=json.dumps(self.updated), headers=request_headers
-        )
-
-    def test_readonly_static_files_remain_available(self):
-        response, body = self.request(self.readonly, "GET", "/")
-        self.assertEqual(response.status, 200)
-        self.assertEqual(body, self.html)
-        response, body = self.request(self.readonly, "GET", "/" + serve.SELECTION_PATH)
-        self.assertEqual(response.status, 200)
-        self.assertEqual(body, self.original_bytes)
-        self.assertEqual(response.getheader("Cache-Control"), "no-cache")
-
-    def test_readonly_hides_editor_api(self):
-        for method in ("GET", "HEAD"):
-            with self.subTest(method=method):
-                response, _ = self.request(self.readonly, method)
-                self.assertEqual(response.status, 404)
-        self.assertEqual(self.selection.read_bytes(), self.original_bytes)
-
-    def test_readonly_rejects_valid_put_with_spoofed_loopback_host(self):
-        port = self.readonly_server.server_address[1]
-        for host in ("127.0.0.1", "localhost", "[::1]"):
-            with self.subTest(host=host):
-                # A reverse proxy can supply a loopback peer and Host, with no
-                # Origin at all. The mode must reject this otherwise-valid edit.
-                response, _ = self.put(self.readonly, {"Host": f"{host}:{port}"})
-                self.assertEqual(response.status, 403)
-                self.assertEqual(self.selection.read_bytes(), self.original_bytes)
-
-    def test_default_local_editor_remains_writable_and_modes_are_isolated(self):
-        response, body = self.request(self.editable, "GET")
-        self.assertEqual(response.status, 200)
-        self.assertEqual(json.loads(body), self.initial)
-        port = self.editable_server.server_address[1]
-        response, body = self.put(self.editable, {"Origin": f"http://127.0.0.1:{port}"})
-        self.assertEqual(response.status, 200)
-        self.assertEqual(json.loads(body), self.updated)
-        self.assertEqual(serve.read_selection(self.root), self.updated)
-        saved_bytes = self.selection.read_bytes()
-        response, _ = self.put(self.readonly)
-        self.assertEqual(response.status, 403)
-        self.assertEqual(self.selection.read_bytes(), saved_bytes)
-        response, body = self.request(self.editable, "GET")
-        self.assertEqual(response.status, 200)
-        self.assertEqual(json.loads(body), self.updated)
-
-    def test_default_local_editor_accepts_no_origin(self):
-        response, _ = self.put(self.editable)
-        self.assertEqual(response.status, 200)
-        self.assertEqual(serve.read_selection(self.root), self.updated)
-
-    def test_local_editor_rejects_foreign_host_and_origin(self):
-        port = self.editable_server.server_address[1]
-        for headers in (
-            {"Host": f"untrusted.example:{port}"},
-            {"Origin": "http://untrusted.example"},
-            {"Origin": "null"},
-        ):
-            with self.subTest(headers=headers):
-                response, _ = self.put(self.editable, headers)
-                self.assertEqual(response.status, 403)
-                self.assertEqual(self.selection.read_bytes(), self.original_bytes)
 
 
 if __name__ == "__main__":

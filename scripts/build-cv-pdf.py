@@ -18,7 +18,7 @@ Layout notes (matched against "Leon Lufkin CV.pdf"):
   - Publications numbered [P9]..[P1], talks [T6]..[T1]; other lists get "–"
   - Centered page numbers
 """
-import os, re, sys
+import base64, os, re, sys
 from html.parser import HTMLParser
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -56,6 +56,7 @@ class CVParser(HTMLParser):
         self._item = None    # current cv-item dict
         self._li = None      # current list item {"segs": [], "date": ""}
         self._mode = None    # what the current buffer is for
+        self._email = 0      # depth inside an obfuscated e-mail element
 
     # -- helpers
     def _cls(self, attrs):
@@ -84,6 +85,17 @@ class CVParser(HTMLParser):
 
     # -- events
     def handle_starttag(self, tag, attrs):
+        if self._email:
+            self._email += 1  # fallback markup inside an address: skip it
+            return
+        encoded = dict(attrs).get("data-email")
+        if encoded and self._buf is not None:
+            # Addresses are base64 in the markup so harvesters cannot read
+            # them (site.js decodes them in the browser); typeset the real one.
+            self._buf.append((base64.b64decode(encoded).decode("utf-8"), self._em > 0, False,
+                              self._links[-1] if self._links else ""))
+            self._email = 1
+            return
         c = self._cls(attrs)
         self._stack.append((tag, c))
         if tag == "h1" and "screen-only" not in c and any("cv-printhead" in cc for _, cc in self._stack[:-1]):
@@ -133,6 +145,9 @@ class CVParser(HTMLParser):
             self._links.append(dict(attrs).get("href") or "")
 
     def handle_endtag(self, tag):
+        if self._email:
+            self._email -= 1
+            return
         if self._stack:
             self._stack.pop()
         if tag == "em" and self._buf is not None:
@@ -208,6 +223,8 @@ class CVParser(HTMLParser):
             self._item["rows"][-1]["segs"] = self._item["rows"][-1].pop("sup")
 
     def handle_data(self, data):
+        if self._email:
+            return
         if self._buf is not None:
             self._buf.append((data, self._em > 0, False,
                               self._links[-1] if self._links else ""))
