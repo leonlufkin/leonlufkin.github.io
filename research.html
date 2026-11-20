@@ -4,17 +4,68 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Research · Leon Lufkin</title>
-  <meta name="description" content="Publications and preprints by Leon Lufkin.">
+  <meta name="description" content="Technical reports and publications by Leon Lufkin.">
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="preload" href="assets/fonts/lmroman-regular.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="assets/css/style.css?v=33">
+  <link rel="stylesheet" href="assets/css/style.css?v=62">
+  <link rel="stylesheet" href="assets/css/gallery.css?v=1">
   <link rel="prefetch" href="index.html">
   <link rel="prefetch" href="cv.html">
-  <script>/* pre-paint bootstrap: saved theme + this session's background */
-(function(){var d=document.documentElement;try{var t=localStorage.getItem("theme");if(t)d.classList.add(t);var p=JSON.parse(sessionStorage.getItem("bg")||"null");var k=(t?t==="dark":matchMedia("(prefers-color-scheme: dark)").matches)?"d":"l";if(p&&p.m===k){d.style.setProperty("--bg-image",'url("'+p.u+'")');d.style.setProperty("--sky",p.c);if(p.w){d.style.setProperty("--bg-wide",'url("'+p.w+'")');if(p.s!=null){d.style.setProperty("--bg-size","auto "+p.s+"%");d.style.setProperty("--bg-pos","center "+p.y+"%");}}}}catch(e){}})();</script>
-  <script src="assets/js/backgrounds.js?v=12" defer></script>
+  <script src="assets/js/background-defaults.js?v=2"></script>
+  <script>/* Prepaint the theme/device default or a compatible explicit session choice. */
+(function () {
+  var root = document.documentElement, theme = null, pick = null;
+  try { theme = localStorage.getItem("theme"); } catch (e) {}
+  if (theme !== "light" && theme !== "dark") theme = null;
+  if (theme) root.classList.add(theme);
+  var mode = theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  var defaults = window.SiteBackgroundDefaults;
+  var fallback = defaults.get(mode), landscape = defaults.get("light");
+  var ratio = Math.max(1, innerWidth) / Math.max(1, innerHeight);
+  try { pick = JSON.parse(sessionStorage.getItem("bg") || "null"); } catch (e) {}
+  var compatible = pick && !pick.preview && pick.m === mode.charAt(0) &&
+    typeof pick.u === "string" && /^\/assets\/(?:backgrounds\/[^"\\\s]+\.jpg|images\/skydiving\.svg)$/.test(pick.u) &&
+    Number.isFinite(pick.width) && pick.width > 0 && Number.isFinite(pick.height) && pick.height > 0 &&
+    (pick.manual === true || pick.v === defaults.version &&
+      (pick.default === true ? pick.u === fallback.u :
+        pick.default === false && pick.viewport === ratio && pick.device === defaults.device()));
+  if (!compatible) pick = fallback;
+  var layered = pick.u === landscape.u && !!landscape.layered;
+  root.classList.toggle("has-landscape", layered);
+  root.style.setProperty("--bg-image", 'url("' + pick.u + '")');
+  var aspect = pick.width / pick.height;
+  var axis = ratio >= aspect ? "sides" : "caps";
+  root.style.setProperty("--sky", pick.edge && pick.edge[axis] || pick.c);
+  root.style.setProperty("--photo-ratio", String(aspect));
+  root.style.setProperty("--photo-inverse", String(1 / aspect));
+  var direction = layered || Math.abs(ratio - aspect) < 0.000001 ? null : ratio > aspect ? "right" : "bottom";
+  root.style.setProperty("--photo-seam", direction
+    ? "linear-gradient(to " + direction + ", transparent, #000 var(--photo-feather), #000 calc(100% - var(--photo-feather)), transparent)"
+    : "none");
+  var validRows = !layered && !pick.subject && ratio > aspect && pick.v === defaults.version && pick.rows &&
+    ["left", "right"].every(function (side) {
+      return typeof pick.rows[side] === "string" && pick.rows[side].indexOf("data:image/png;base64,") === 0;
+    });
+  ["left", "right"].forEach(function (side) {
+    root.style.removeProperty("--bg-rows-" + side);
+    if (validRows) {
+      root.style.setProperty("--bg-rows-" + side, 'url("' + pick.rows[side] + '")');
+    }
+  });
+  if (layered) (landscape.preload || []).forEach(function (url) {
+    var link = document.createElement("link");
+    link.rel = "preload"; link.as = "image"; link.href = url;
+    document.head.appendChild(link);
+  });
+})();</script>
+  <script src="assets/js/backgrounds.js?v=21" defer></script>
   <script src="assets/js/gate.js?v=1" defer></script>
-  <script src="assets/js/site.js?v=9" defer></script>
+  <script src="assets/js/background-selections.js?v=2" defer></script>
+  <script src="assets/js/background-rows.js?v=3" defer></script>
+  <script src="assets/js/site.js?v=27" defer></script>
+  <script src="assets/js/landscape-gpu.js?v=1" defer></script>
+  <script src="assets/js/landscape.js?v=5" defer></script>
+  <script src="assets/js/gallery.js?v=6" defer></script>
 </head>
 
 <body>
@@ -23,6 +74,13 @@
       <a href="index.html">Leon</a>
       <a href="research.html" aria-current="page">Research</a>
       <a href="cv.html">CV</a>
+      <button type="button" class="theme-toggle" aria-label="Switch color theme">
+        <span class="theme-icon theme-icon-sun" aria-hidden="true">☀︎</span>
+        <span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span>
+      </button>
+      <button type="button" class="theme-toggle gallery-btn" aria-label="Photo gallery" aria-controls="gallery" aria-expanded="false">
+        <span class="theme-icon" aria-hidden="true">▦</span>
+      </button>
     </nav>
   </header>
 
@@ -30,57 +88,61 @@
     <!-- TODO: add a Research Topics section here (Leon, July 2026) -->
     <ul class="pubs">
       <li class="pub">
-        <p class="pub-title"><a href="https://arxiv.org/abs/2603.22325">Hybrid associative memories</a></p>
-        <p class="pub-authors"><span class="me">Leon Lufkin</span>, Tomás Figliolia, Beren Millidge, Kamesh Krishnamurthy</p>
-        <p class="pub-meta"><span>Preprint, 2026</span></p>
+        <p class="pub-title"><a href="https://arxiv.org/abs/2610.42112">Subquadratic attention with a hierarchical tree-structured indexer</a></p>
+        <p class="pub-authors"><span class="me">Leon Lufkin</span>, Cutter Dawes, Alexander Speicher, Kamesh Krishnamurthy, Tomás Figliolia, Beren Millidge</p>
+        <p class="pub-meta"><span>Technical Report, 2026</span> <span class="right"><a href="https://arxiv.org/abs/2610.42112">Paper</a></span></p>
       </li>
 
       <li class="pub">
-        <p class="pub-title">Nonlinear dynamics of localization in neural receptive fields</p>
+        <p class="pub-title"><a href="https://arxiv.org/abs/2603.22325">Hybrid associative memories</a></p>
+        <p class="pub-authors"><span class="me">Leon Lufkin</span>, Tomás Figliolia, Beren Millidge, Kamesh Krishnamurthy</p>
+        <p class="pub-meta"><span>Technical Report, 2026</span> <span class="right"><a href="https://arxiv.org/abs/2603.22325">Paper</a></span></p>
+      </li>
+
+      <li class="pub">
+        <p class="pub-title"><a href="https://proceedings.neurips.cc/paper_files/paper/2024/hash/2dab2f94544f9297d01a46a5453b93cd-Abstract-Conference.html">Nonlinear dynamics of localization in neural receptive fields</a></p>
         <p class="pub-authors"><span class="me">Leon Lufkin</span>, Andrew Saxe, Erin Grant</p>
-        <p class="pub-meta"><span><em>Advances in Neural Information Processing Systems (NeurIPS)</em>, 2024</span></p>
+        <p class="pub-meta"><span><em>Advances in Neural Information Processing Systems (NeurIPS)</em>, 2024</span> <span class="right"><a href="https://proceedings.neurips.cc/paper_files/paper/2024/hash/2dab2f94544f9297d01a46a5453b93cd-Abstract-Conference.html">Paper</a></span></p>
         <p class="pub-note">Spotlight (&lt;4% of submissions)</p>
       </li>
 
       <li class="pub">
         <p class="pub-title"><a href="https://arxiv.org/abs/2402.09693">Sharp information-theoretic thresholds for shuffled linear regression</a></p>
         <p class="pub-authors"><span class="me">Leon Lufkin</span>, Yihong Wu, Jiaming Xu</p>
-        <p class="pub-meta"><span><em>International Symposium on Information Theory (ISIT)</em>, 2024</span></p>
+        <p class="pub-meta"><span><em>International Symposium on Information Theory (ISIT)</em>, 2024</span> <span class="right"><a href="https://arxiv.org/abs/2402.09693">Paper</a></span></p>
       </li>
 
       <li class="pub">
         <p class="pub-title"><a href="https://arxiv.org/abs/2309.00597">The QUATRO application suite: quantum computing for models of human cognition</a></p>
         <p class="pub-authors">Raghavendra Pothukuchi, <span class="me">Leon Lufkin</span>, &hellip;, Jonathan Cohen, Abhishek Bhattacharjee</p>
-        <p class="pub-meta"><span>Preprint, 2023</span></p>
+        <p class="pub-meta"><span>Preprint, 2023</span> <span class="right"><a href="https://arxiv.org/abs/2309.00597">Paper</a></span></p>
       </li>
 
       <li class="pub">
         <p class="pub-title"><a href="https://www.frontiersin.org/journals/epidemiology/articles/10.3389/fepid.2023.1216497/full">A stronger association of depression with rheumatoid arthritis in presence of obesity and hypertriglyceridemia</a></p>
         <p class="pub-authors">Grayden Shand, Daniel T. Fuller, <span class="me">Leon Lufkin</span>, Carly Lovelett, Nabendu Pal, Sumona Mondal, Shantanu Sur</p>
-        <p class="pub-meta"><span><em>Frontiers in Epidemiology</em>, 2023</span></p>
+        <p class="pub-meta"><span><em>Frontiers in Epidemiology</em>, 2023</span> <span class="right"><a href="https://www.frontiersin.org/journals/epidemiology/articles/10.3389/fepid.2023.1216497/full">Paper</a></span></p>
       </li>
 
       <li class="pub">
         <p class="pub-title"><a href="https://www.frontiersin.org/journals/molecular-biosciences/articles/10.3389/fmolb.2022.1009402/full">Glis1 and oxaloacetate in nucleus pulposus stromal cell somatic reprogramming and survival</a></p>
         <p class="pub-authors"><span class="me">Leon Lufkin</span>, Ankita Samanta, &hellip;, Petra Kraus</p>
-        <p class="pub-meta"><span><em>Frontiers in Molecular Biosciences</em>, 2022</span></p>
+        <p class="pub-meta"><span><em>Frontiers in Molecular Biosciences</em>, 2022</span> <span class="right"><a href="https://www.frontiersin.org/journals/molecular-biosciences/articles/10.3389/fmolb.2022.1009402/full">Paper</a></span></p>
       </li>
 
       <li class="pub">
         <p class="pub-title"><a href="https://arxiv.org/abs/2205.13614">Emergent organization of receptive fields in networks of excitatory and inhibitory neurons</a></p>
         <p class="pub-authors"><span class="me">Leon Lufkin</span>, Ashish Puri, Ganlin Song, Xinyi Zhong, John Lafferty</p>
-        <p class="pub-meta"><span>Preprint, 2022</span></p>
+        <p class="pub-meta"><span>Preprint, 2022</span> <span class="right"><a href="https://arxiv.org/abs/2205.13614">Paper</a></span></p>
       </li>
 
       <li class="pub">
-        <p class="pub-title"><a href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8415718/">A Bayesian model to analyze the association of rheumatoid arthritis with risk factors and their interactions</a></p>
+        <p class="pub-title"><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8415718/">A Bayesian model to analyze the association of rheumatoid arthritis with risk factors and their interactions</a></p>
         <p class="pub-authors"><span class="me">Leon Lufkin</span>, Marko Budišić, Sumona Mondal, Shantanu Sur</p>
-        <p class="pub-meta"><span><em>Frontiers in Public Health</em>, 2021</span></p>
+        <p class="pub-meta"><span><em>Frontiers in Public Health</em>, 2021</span> <span class="right"><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8415718/">Paper</a></span></p>
       </li>
     </ul>
   </main>
 
-  <!-- TEMPORARY font/border preview tool — remove when decided -->
-  <script src="assets/js/switcher.js?v=20" defer></script>
 </body>
 </html>

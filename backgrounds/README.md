@@ -18,11 +18,59 @@ backgrounds/
   thirds-todo.txt photos marked for recomposition to rule-of-thirds framing
 ```
 
-Display rule: a photo is never zoomed in. The site renders backgrounds with
-`contain` (whole photo, natural aspect, centered) and fills leftover space
-with the photo's own averaged edge color (stored in the manifest). Panoramas
-(aspect > 2) are exported wider (3200px) and their fill color comes from the
-top/bottom edges, since that's where their fill bands appear.
+Display rule: ordinary originals remain fully visible with `contain`. Horizontal
+margins extend each photo row using separate colors from its left and right
+edges. Two one-pixel-wide strips fill the corresponding half of the viewport
+behind the original. Each changes vertically, and neither mixes in colors
+from the opposite side. Their center join stays hidden behind the sharp photo.
+Top/bottom margins retain a single sampled color. For Random selection, of the
+photos in the active good set, only those whose aspect ratios cover the most screen area are eligible
+(within two percentage points of the best fit). The theme then prefers light
+or dark photos among those matches. Ordinary photos are never cropped or stretched.
+The photo fades into the margin along its left/right or top/bottom boundary,
+depending on the screen shape, at 12% of the photo dimension per edge by default.
+The temporary style-preview adjustment panel is not loaded by the served pages.
+Fill and photo use identical washes so the transition does not darken or brighten twice.
+
+The Home/Moon photos retain the same contain scale and original image. Their
+`subject` metadata identifies the moon disc; the browser centers it horizontally
+over the content box and shifts it vertically only as needed to reveal a cap
+above or below the box. Extra space uses the photo's sampled near-black fill,
+without row strips. Black image margins may move outside the viewport, but the
+moon itself stays on screen. Placement never switches the selected photo.
+On long pages with neither vertical edge visible, the moon stays centered
+behind the box instead of moving sideways. The color sampler's `SUBJECTS` map
+preserves these bounds when the photo catalog is regenerated.
+
+`assets/js/background-rows.js` derives and caches the two horizontal color strips
+in the browser from thin 3% edge samples, with slight vertical smoothing.
+Each photo also has two restrained fallback colors: `edge.sides` for left/right
+margins while its strip loads and `edge.caps` for top/bottom margins. The runtime
+applies the same light/dark wash over photo and margins.
+Run `uv run --with pillow python
+scripts/sample-background-colors.py` to derive colors from thin border strips;
+the sampler also runs at the end of the export pipeline. Thun's side color
+has an explicit muted-blue override. Dimensions and samples honor EXIF rotation.
+
+The Sossusvlei dune-ridge photo has an optional, quiet generated extension,
+configured by its `assets/backgrounds/widened/*.extension.json` sidecar.
+On wide screens this layer sits between the row colors and the original,
+with an actual 8px blur and faded outer edges. The original is kept in front.
+Other ordinary photos use row colors alone. A `?photo=sossusvlei_dune2` review link
+opens that photo temporarily without changing either curated set.
+
+Open the local photo gallery to curate separate **Laptop** and **Mobile**
+sets. Click a photo to preview it on the page; use its separate **Good**
+checkbox to include or exclude it. Tabs and previews retain unsaved choices.
+**Save** writes both sets to `assets/js/background-selections.js` through the
+loopback-only development server (`python3 scripts/serve.py 4000 .`). Each set
+must contain at least one photo. Regular public visitors see the gallery
+without editing controls.
+
+Each manifest entry records the exported JPEG's width and height. The current
+photo stays across navigation and resizing while it remains eligible. Mobile
+uses a viewport at most 620px wide, or a touch device with a short side at most
+620px (including landscape phones). Panoramas are exported up to 3200px wide.
 
 To skip a photo (keep it, but out of rotation): move it to `skipped/`, delete
 its JPEG from `assets/backgrounds/`, and rerun `scripts/export-backgrounds.sh`.

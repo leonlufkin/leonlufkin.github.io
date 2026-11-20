@@ -45,6 +45,9 @@
 }
 
 :root {
+  /* --photo-seam is defined here by site.js, so its width dependency must
+     resolve here too, before the computed gradient is inherited by ::after. */
+  --photo-feather: var(--photo-blend-width, 12%);
   --bg: #ffffff;
   --text: #1a1a1a;
   --muted: #666666;
@@ -91,31 +94,92 @@ html {
   display: none;
 }
 
-/* Background photo behind a translucent wash, fixed to the viewport.
-   Rule: a photo is never zoomed in. It renders whole at its natural aspect
-   (contain), centered. Under it, an optional AI-widened variant (--bg-wide)
-   extends the scene on wide windows — its low-res center stays hidden behind
-   the sharp original. Beyond both, the photo's own averaged edge color
-   (--sky, from the manifest) fills the rest. */
+/* Fill and photo share the same wash. Feather only the photo's boundary.
+   Subject-aware photos retain contain scale and can shift into the solid fill. */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
-  z-index: -1;
+  z-index: -4;
+  pointer-events: none;
   background:
     linear-gradient(var(--wash), var(--wash)),
-    var(--bg-image, url("../images/background-web.jpg")) var(--bg-pos, center) / var(--bg-size, contain) no-repeat,
-    var(--bg-wide, none) center / auto 100% no-repeat var(--sky);
+    var(--bg-rows-left, none) left / 50% 100% no-repeat,
+    var(--bg-rows-right, none) right / 50% 100% no-repeat var(--sky);
 }
 
-/* Squarish/tall windows: the original may fit by width there, which would
-   misalign the height-fitted widened layer — drop it and keep the plain fill */
-@media (max-aspect-ratio: 4/3) {
-  body::before {
-    background:
-      linear-gradient(var(--wash), var(--wash)),
-      var(--bg-image, url("../images/background-web.jpg")) center / contain no-repeat var(--sky);
-  }
+body::after {
+  content: "";
+  position: fixed;
+  left: calc(50% + var(--photo-offset-x, 0px));
+  top: calc(50% + var(--photo-offset-y, 0px));
+  transform: translate(-50%, -50%);
+  width: min(100vw, calc(100vh * var(--photo-ratio, 0.75)));
+  height: min(100vh, calc(100vw * var(--photo-inverse, 1.3333333333333333)));
+  width: min(100vw, calc(100dvh * var(--photo-ratio, 0.75)));
+  height: min(100dvh, calc(100vw * var(--photo-inverse, 1.3333333333333333)));
+  z-index: -2;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--wash), var(--wash)),
+    var(--bg-image, url("../images/background-web.jpg")) center / contain no-repeat;
+  -webkit-mask-image: var(--photo-seam, none);
+  mask-image: var(--photo-seam, none);
+}
+
+/* The layered scene owns its visible pixels; photos keep their wash and seam. */
+.has-landscape body::after { content: none; }
+:root.has-landscape:not(.dark) { --wash: rgba(255, 255, 255, 0.25); }
+@media (prefers-color-scheme: dark) {
+  :root.has-landscape:not(.light) { --wash: rgba(14, 14, 14, 0.65); }
+}
+/* The stage stays laid out while hidden so the scene can be prepared behind a photo. */
+#landscape-stage {
+  visibility: hidden;
+  position: fixed;
+  z-index: -2;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  pointer-events: none;
+  contain: layout paint;
+}
+.has-landscape #landscape-stage.is-ready { visibility: visible; }
+.landscape-fill,
+.landscape-gpu {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+.landscape-gpu { display: none; }
+.has-gpu .landscape-gpu { display: block; }
+.has-gpu .landscape-fill,
+.landscape-piece { display: none; }
+
+/* Quiet generated surroundings stay behind the sharp original photograph.
+   Blur is applied to this layer itself, as well as feathering the photo seam. */
+#bg-extension { display: none; }
+.has-extension #bg-extension {
+  display: block;
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: var(--extension-width);
+  height: var(--extension-height);
+  z-index: -3;
+  pointer-events: none;
+  background: linear-gradient(var(--wash), var(--wash)),
+    var(--bg-extension) center / 100% 100% no-repeat;
+  filter: blur(8px);
+  mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent),
+    linear-gradient(to bottom, transparent, #000 3%, #000 97%, transparent);
+  mask-composite: intersect;
 }
 
 body {
@@ -149,97 +213,6 @@ a:hover {
   text-underline-offset: 3px;
 }
 
-/* Photo gallery (opened from the nav ▦) ---------------------------------- */
-
-#gallery {
-  position: fixed;
-  inset: 0;
-  z-index: 5;
-  display: none;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  background: var(--bg);
-  padding: 4rem 1.25rem 2.5rem;
-}
-
-:root.gallery-open #gallery {
-  display: block;
-}
-
-:root.gallery-open body {
-  overflow: hidden; /* lock page scroll behind the gallery */
-}
-
-.gallery-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 1rem 0.9rem;
-  max-width: 64rem;
-  margin: 0 auto;
-}
-
-.gallery-grid figure {
-  margin: 0;
-  cursor: pointer;
-}
-
-.gallery-grid img {
-  display: block;
-  width: 100%;
-  height: 110px;
-  object-fit: cover;
-  border: 1px solid var(--line);
-}
-
-.gallery-grid figcaption {
-  margin-top: 0.3rem;
-  color: var(--muted);
-  font-size: 0.72rem;
-  font-style: italic;
-}
-
-.gallery-close {
-  position: fixed;
-  top: 12px;
-  right: 14px;
-  z-index: 6;
-  width: 40px;
-  height: 40px;
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--text);
-  font-family: inherit;
-  font-size: 1.15rem;
-  line-height: 1;
-  cursor: pointer;
-}
-
-@media (max-width: 620px) {
-  .gallery-grid {
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  }
-
-  .gallery-grid img {
-    height: 90px;
-  }
-}
-
-/* Faint location label for the background photo, bottom-left ------------- */
-
-.bg-label {
-  position: fixed;
-  left: 16px;
-  bottom: 12px;
-  z-index: 1;
-  color: var(--text);
-  opacity: 0.32;
-  font-size: 0.8rem;
-  font-style: italic;
-  pointer-events: none;
-  user-select: none;
-}
-
 /* Navigation ------------------------------------------------------------- */
 
 header {
@@ -269,7 +242,7 @@ nav a[aria-current="page"] {
   font-weight: 700;
 }
 
-/* Light/dark toggle (button injected into the nav by site.js) ------------ */
+/* Initial-markup theme and gallery controls ------------------------------ */
 
 .theme-toggle {
   padding: 0;
@@ -280,6 +253,20 @@ nav a[aria-current="page"] {
   font-size: 1.0625rem;
   line-height: 1;
   cursor: pointer;
+}
+
+/* Text glyphs, never emoji; the theme icon shows the mode you'd switch TO. */
+.theme-icon {
+  display: block;
+  font-variant-emoji: text;
+}
+
+.theme-icon-sun { display: none; }
+:root.dark .theme-icon-sun { display: block; }
+:root.dark .theme-icon-moon { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) .theme-icon-sun { display: block; }
+  :root:not(.light) .theme-icon-moon { display: none; }
 }
 
 /* Headings --------------------------------------------------------------- */
@@ -590,12 +577,14 @@ body.home main {
 
   /* strip everything that isn't the CV text */
   body::before,
+  body::after,
+  #bg-extension,
+  #landscape-stage,
   main::before,
   header,
   nav,
   .theme-toggle,
   #style-switcher,
-  .bg-label,
   .screen-only {
     display: none !important;
   }

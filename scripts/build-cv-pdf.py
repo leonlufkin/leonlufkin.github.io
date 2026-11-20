@@ -15,7 +15,7 @@ Layout notes (matched against "Leon Lufkin CV.pdf"):
   - Section headings: bold title-case, NO rule
   - Entries: bold org left + date right; "– Supervised by ..." hanging items;
     description lines align under the text after the dash, no dash
-  - Publications numbered [P7]..[P1], talks [T6]..[T1]; other lists get "–"
+  - Publications numbered [P9]..[P1], talks [T6]..[T1]; other lists get "–"
   - Centered page numbers
 """
 import os, re, sys
@@ -38,10 +38,10 @@ def font(path):
 
 # ---------------------------------------------------------------- parse ----
 # Minimal extractor tuned to cv.html's controlled markup. Text segments carry
-# an italic flag so <em> venues survive into the PDF.
+# italic/underline flags and a URL so inline formatting and links survive.
 
 class Seg(tuple):
-    pass  # (text, italic)
+    pass  # (text, italic, underline, link)
 
 class CVParser(HTMLParser):
     def __init__(self):
@@ -50,8 +50,9 @@ class CVParser(HTMLParser):
         self.sections = []   # [(heading, [blocks])]
         self._sec = None
         self._stack = []     # element class context
-        self._buf = None     # list of (text, italic) while capturing
+        self._buf = None     # list of (text, italic, underline, link)
         self._em = 0
+        self._links = []
         self._item = None    # current cv-item dict
         self._li = None      # current list item {"segs": [], "date": ""}
         self._mode = None    # what the current buffer is for
@@ -62,22 +63,23 @@ class CVParser(HTMLParser):
 
     def _start_buf(self, mode):
         self._buf, self._mode, self._em = [], mode, 0
+        self._links = []
         self._nest = 0  # nested inline spans (e.g. class="me") within a capture
 
     def _text(self):
-        segs = [(t, i) for (t, i) in self._buf or [] if t]
+        segs = [s for s in self._buf or [] if s[0]]
         # collapse whitespace across segments
         out, prev_sp = [], True
-        for t, i in segs:
+        for t, i, ul, link in segs:
             t = re.sub(r"\s+", " ", t)
             if prev_sp:
                 t = t.lstrip()
             if t:
-                out.append((t, i))
+                out.append((t, i, ul, link))
                 prev_sp = t.endswith(" ")
         if out:
-            last, i = out[-1]
-            out[-1] = (last.rstrip(), i)
+            last, i, ul, link = out[-1]
+            out[-1] = (last.rstrip(), i, ul, link)
         return [s for s in out if s[0]]
 
     # -- events
@@ -127,6 +129,8 @@ class CVParser(HTMLParser):
             self._start_buf("prose")
         elif tag == "em" and self._buf is not None:
             self._em += 1
+        elif tag == "a" and self._buf is not None:
+            self._links.append(dict(attrs).get("href") or "")
 
     def handle_endtag(self, tag):
         if self._stack:
@@ -134,6 +138,10 @@ class CVParser(HTMLParser):
         if tag == "em" and self._buf is not None:
             self._em = max(0, self._em - 1)
             return
+        if tag == "a" and self._buf is not None:
+            if self._links:
+                self._links.pop()
+            return  # an inline link must not end the enclosing text capture
         if tag == "span" and self._buf is not None and getattr(self, "_nest", 0) > 0:
             self._nest -= 1  # closing an inline span, not the capture
             return
@@ -153,7 +161,7 @@ class CVParser(HTMLParser):
                 self._mode = None
             return
         segs, mode = self._text(), self._mode
-        plain = "".join(t for t, _ in segs)
+        plain = "".join(s[0] for s in segs)
         if mode == "name":
             self.name = plain
         elif mode == "contact":
@@ -201,7 +209,8 @@ class CVParser(HTMLParser):
 
     def handle_data(self, data):
         if self._buf is not None:
-            self._buf.append((data, self._em > 0))
+            self._buf.append((data, self._em > 0, False,
+                              self._links[-1] if self._links else ""))
         if self._li is not None and self._buf is None:
             pass
 
@@ -258,12 +267,13 @@ def underline_name(segs):
     out = []
     for seg in segs:
         t, it = seg[0], seg[1]
+        link = seg[3] if len(seg) > 3 else ""
         parts = t.split(NAME)
         for i, part in enumerate(parts):
             if part:
-                out.append((part, it, False))
+                out.append((part, it, False, link))
             if i < len(parts) - 1:
-                out.append((NAME, it, True))
+                out.append((NAME, it, True, link))
     return out
 
 def seg_width(pdf, segs, size=BODY):
@@ -274,24 +284,55 @@ def seg_width(pdf, segs, size=BODY):
         w += pdf.get_string_width(t)
     return w
 
-def est_lines(pdf, segs, width, size=BODY):
-    # crude greedy wrap estimate, segment-aware
-    words = []
+def wrapped_lines(pdf, segs, width, size=BODY, bold=False):
+    """Wrap complete words across inline style/link boundaries.
+
+    An opening quote outside <a> and the linked word following it are one
+    unbreakable unit, as are a linked final word and its closing punctuation.
+    Separate write() calls cannot determine those boundaries themselves.
+    """
+    words, word, spaces = [], [], []
     for seg in segs:
-        t, it = seg[0], seg[1]
-        for w in re.split(r"(\s+)", t):
-            if w:
-                words.append((w, it))
-    lines, cur = 1, 0.0
-    for w, it in words:
-        pdf.set_font("LM", "I" if it else "", size)
-        ww = pdf.get_string_width(w)
-        if cur + ww > width and cur > 0 and not w.isspace():
-            lines += 1
-            cur = ww
-        else:
-            cur += ww
-    return lines
+        for token in re.findall(r"\s+|\S+", seg[0]):
+            part = (token, *seg[1:])
+            if token.isspace():
+                if word:
+                    words.append((spaces, word))
+                    spaces, word = [], []
+                spaces.append(part)
+            else:
+                word.append(part)
+    if word:
+        words.append((spaces, word))
+
+    def measure(parts):
+        total = 0.0
+        for part in parts:
+            pdf.set_font("LM", ("B" if bold else "") + ("I" if part[1] else ""), size)
+            total += pdf.get_string_width(part[0])
+        return total
+
+    lines, line, used = [], [], 0.0
+    # fpdf.write reserves a cell margin at each edge of the logical line.
+    available = width - 2 * pdf.c_margin
+    for spaces, word in words:
+        word_width = measure(word)
+        space_width = measure(spaces) if line else 0.0
+        if line and used + space_width + word_width > available:
+            lines.append(line)
+            line, used = [], 0.0
+        if line:
+            line.extend(spaces)
+            used += space_width
+        line.extend(word)
+        used += word_width
+    if line:
+        lines.append(line)
+    return lines or [[]]
+
+
+def est_lines(pdf, segs, width, size=BODY, bold=False):
+    return len(wrapped_lines(pdf, segs, width, size, bold))
 
 def write_segs(pdf, segs, x, right_reserve=0.0, size=BODY, bold=False):
     """Flow segments starting at x; wrapped lines return to x."""
@@ -299,13 +340,24 @@ def write_segs(pdf, segs, x, right_reserve=0.0, size=BODY, bold=False):
     pdf.set_left_margin(x)
     pdf.set_right_margin(MARGIN + right_reserve)
     pdf.set_xy(x, y0)
-    for seg in segs:
-        t, it = seg[0], seg[1]
-        ul = seg[2] if len(seg) > 2 else False
-        style = ("B" if bold else "") + ("I" if it else "") + ("U" if ul else "")
-        pdf.set_font("LM", style, size)
-        pdf.write(LEAD, t)
-    pdf.ln(LEAD)
+    lines = wrapped_lines(pdf, segs, PAGE_W - x - MARGIN - right_reserve, size, bold)
+    for line in lines:
+        # Merge adjacent fragments of the same style/URL to keep annotations
+        # compact and avoid artificial word breaks at HTML tag boundaries.
+        merged = []
+        for part in line:
+            if merged and part[1:] == merged[-1][1:]:
+                merged[-1] = (merged[-1][0] + part[0], *part[1:])
+            else:
+                merged.append(part)
+        for seg in merged:
+            t, it = seg[0], seg[1]
+            ul = seg[2] if len(seg) > 2 else False
+            link = seg[3] if len(seg) > 3 else ""
+            style = ("B" if bold else "") + ("I" if it else "") + ("U" if ul else "")
+            pdf.set_font("LM", style, size)
+            pdf.write(LEAD, t, link=link)
+        pdf.ln(LEAD)
     pdf.set_left_margin(MARGIN)
     pdf.set_right_margin(MARGIN)
     return y0
@@ -318,7 +370,7 @@ def line_with_date(pdf, segs, date, x, size=BODY, bold=False, dash=None, num=Non
         date_w = pdf.get_string_width(date) + 10
     # keep-together check
     width = PAGE_W - x - MARGIN - date_w
-    n = est_lines(pdf, segs, width, size)
+    n = est_lines(pdf, segs, width, size, bold)
     if pdf.get_y() + n * LEAD > PAGE_H - BOTTOM:
         pdf.add_page()
     y0 = pdf.get_y()
@@ -378,13 +430,13 @@ def build():
         for kind, payload in blocks:
             if kind == "item":
                 it = payload
-                line_with_date(pdf, [(t, i) for t, i in it["title"]], it["date"],
+                line_with_date(pdf, it["title"], it["date"],
                                MARGIN, bold=True)
                 edu = heading.lower().startswith("education")
                 for row in it["rows"]:
                     if row["kind"] == "sup":
                         # supervisor / role lines are italic, as on the site
-                        ital = [(t, True) for t, _ in row["segs"]]
+                        ital = [(s[0], True, s[2], s[3]) for s in row["segs"]]
                         line_with_date(pdf, ital, row.get("date", ""),
                                        TEXT_X, dash=True)
                     else:
