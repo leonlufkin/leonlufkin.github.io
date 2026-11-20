@@ -270,10 +270,9 @@ nav a[aria-current="page"] {
   font-weight: 700;
 }
 
-/* Initial-markup controls: theme, and the grid that lifts the text box ------- */
+/* Initial-markup theme control ------------------------------------------- */
 
-.theme-toggle,
-.reveal-toggle {
+.theme-toggle {
   padding: 0;
   border: none;
   background: none;
@@ -298,7 +297,7 @@ nav a[aria-current="page"] {
   :root:not(.light) .theme-icon-moon { display: none; }
 }
 
-/* The grid button hides the page's text box, at once, so the background shows whole. */
+/* Esc hides the page's text box, at once, so the background shows whole. */
 :root.content-hidden .intro,
 :root.content-hidden body:not(.home) main {
   visibility: hidden;
@@ -655,7 +654,6 @@ body.home main {
   header,
   nav,
   .theme-toggle,
-  .reveal-toggle,
   #style-switcher,
   .screen-only {
     display: none !important;

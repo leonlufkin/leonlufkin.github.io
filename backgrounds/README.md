@@ -2,7 +2,7 @@
 
 The site has two backgrounds, chosen by the theme alone. Both are fixed to the
 viewport: they never depend on the page, its scroll position, a scrollbar or a
-mobile browser's bars. The grid button in the nav hides the page's text box, so
+mobile browser's bars. Pressing Esc hides the page's text box (and shows it again), so
 either one can be seen whole (on the home page that reveals the skydiver, or
 the moon).
 

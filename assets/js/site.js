@@ -26,7 +26,7 @@
 
   /* --- Theme ------------------------------------------------------------- */
 
-  var themeButton, revealButton;
+  var themeButton;
 
   function label() {
     if (themeButton) {
@@ -52,13 +52,14 @@
     });
   }
 
-  // Unadvertised: D switches the theme, as on many sites. Never while typing.
+  // Unadvertised keys: D switches the theme, as on many sites, and Esc hides the
+  // page's text box. Never while typing, with a modifier, or on key repeat.
   document.addEventListener("keydown", function (e) {
     if (e.defaultPrevented || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
-    if (e.key !== "d" && e.key !== "D") return;
     var target = e.target;
     if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
-    toggleTheme();
+    if (e.key === "d" || e.key === "D") toggleTheme();
+    else if (e.key === "Escape") toggleContent();
   });
 
   // The fill color and the photo's feathered edge follow the window's shape.
@@ -72,13 +73,12 @@
   });
 
   /* --- Text-box toggle ---------------------------------------------------
-     The grid button hides the page's text box (the bio on the home page), so
-     the skydiver or the moon behind it shows whole. Pressing it again,
-     switching the theme or opening another page brings the text back. */
+     Esc hides the page's text box (the bio on the home page), so the skydiver
+     or the moon behind it shows whole. Esc again, switching the theme or
+     opening another page brings the text back. */
 
   function setContentHidden(hidden) {
     root.classList.toggle("content-hidden", hidden);
-    if (revealButton) revealButton.setAttribute("aria-pressed", String(hidden));
   }
 
   function toggleContent() {
@@ -107,9 +107,7 @@
   function mount() {
     var nav = document.querySelector("nav");
     themeButton = nav && nav.querySelector(".theme-toggle");
-    revealButton = nav && nav.querySelector(".reveal-toggle");
     if (themeButton) themeButton.onclick = toggleTheme;
-    if (revealButton) revealButton.onclick = toggleContent;
     label();
     setContentHidden(false); // a newly shown page always arrives with its text
     showEmails();

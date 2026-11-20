@@ -53,15 +53,13 @@ function browser({ page = 'index.html', width = 1440, height = 900, ratio = 2, s
 
   function mountPage(name) {
     if (nav) nav.remove();
-    box = element(name === 'index.html' ? 'section' : 'main');
-    // Each page's text box sits somewhere else; the background must not care.
-    const top = 140 + 60 * PAGES.indexOf(name);
-    box.getBoundingClientRect = () => ({ left: 368, right: 1072, top, bottom: top + 400 + 300 * PAGES.indexOf(name), width: 704, height: 400 + 300 * PAGES.indexOf(name) });
+    if (box) box.remove();
     nav = element('nav');
     const theme = nav.appendChild(element('button')); theme.className = 'theme-toggle';
-    const reveal = nav.appendChild(element('button')); reveal.className = 'reveal-toggle';
-    reveal.setAttribute('aria-pressed', 'false');
     box = element(name === 'index.html' ? 'section' : 'main');
+    // Each page's text box sits somewhere else; the background must not care.
+    const top = 140 + 60 * PAGES.indexOf(name), height = 400 + 300 * PAGES.indexOf(name);
+    box.getBoundingClientRect = () => ({ left: 368, right: 1072, top, bottom: top + height, width: 704, height });
     for (const [tag, encoded] of name === 'cv.html' ? [['span', 'bHVma2luQHN0YW5mb3JkLmVkdQ=='], ['a', 'bGVvbkB6eXBocmEuY29t']] : []) {
       const address = box.appendChild(element(tag));
       address.className = 'email-rev'; address.textContent = 'reversed fallback';
@@ -105,7 +103,6 @@ function browser({ page = 'index.html', width = 1440, height = 900, ratio = 2, s
   const b = { context, html, head, requests, images,
     get nav() { return nav; }, get box() { return box; },
     get themeButton() { return nav.querySelector('.theme-toggle'); },
-    get revealButton() { return nav.querySelector('.reveal-toggle'); },
     theme: () => storage.has('theme') ? storage.get('theme') : null,
     loadSite() { vm.runInContext(source('assets/js/site.js'), context, { filename: 'site.js' }); return b; },
     emit(type) { context.dispatchEvent({ type }); },
@@ -222,29 +219,30 @@ test('D switches the theme, but never while typing, with a modifier, or on key r
   assert.equal(b.theme(), 'light');
 });
 
-test('the grid button hides the text box and shows it again; a new page or a theme switch brings the text back', () => {
+test('Esc hides the text box and shows it again; a new page or a theme switch brings the text back', () => {
   for (const page of PAGES) {
     const b = browser({ page }).loadSite();
     const hidden = () => b.html.classList.contains('content-hidden');
     assert.equal(hidden(), false);
-    b.revealButton.fire('click');
+    b.key('Escape');
     assert.equal(hidden(), true);
-    assert.equal(b.revealButton.getAttribute('aria-pressed'), 'true');
-    b.revealButton.fire('click');
+    b.key('Escape');
     assert.equal(hidden(), false);
-    assert.equal(b.revealButton.getAttribute('aria-pressed'), 'false');
-    b.revealButton.fire('click');
+    b.key('Escape');
     b.swap('research.html');
-    assert.equal(hidden(), false);
-    assert.equal(b.revealButton.getAttribute('aria-pressed'), 'false');
-    b.revealButton.fire('click');
-    assert.equal(hidden(), true, 'the swapped-in button works too');
+    assert.equal(hidden(), false, 'a new page arrives with its text');
+    b.key('Escape');
+    assert.equal(hidden(), true);
     b.themeButton.fire('click');
     assert.equal(hidden(), false, 'the theme button brings the text back');
-    assert.equal(b.revealButton.getAttribute('aria-pressed'), 'false');
-    b.revealButton.fire('click');
+    b.key('Escape');
     b.key('d');
     assert.equal(hidden(), false, 'so does the D key');
+    for (const event of [{ metaKey: true }, { ctrlKey: true }, { altKey: true }, { repeat: true }, { defaultPrevented: true },
+      { target: { tagName: 'INPUT' } }, { target: { tagName: 'TEXTAREA' } }, { target: { tagName: 'DIV', isContentEditable: true } }]) {
+      b.key('Escape', event);
+      assert.equal(hidden(), false, 'ignored: ' + JSON.stringify(event));
+    }
   }
 });
 
