@@ -222,7 +222,7 @@ test('D switches the theme, but never while typing, with a modifier, or on key r
   assert.equal(b.theme(), 'light');
 });
 
-test('the grid button hides the text box and shows it again; a new page always arrives with its text', () => {
+test('the grid button hides the text box and shows it again; a new page or a theme switch brings the text back', () => {
   for (const page of PAGES) {
     const b = browser({ page }).loadSite();
     const hidden = () => b.html.classList.contains('content-hidden');
@@ -239,6 +239,12 @@ test('the grid button hides the text box and shows it again; a new page always a
     assert.equal(b.revealButton.getAttribute('aria-pressed'), 'false');
     b.revealButton.fire('click');
     assert.equal(hidden(), true, 'the swapped-in button works too');
+    b.themeButton.fire('click');
+    assert.equal(hidden(), false, 'the theme button brings the text back');
+    assert.equal(b.revealButton.getAttribute('aria-pressed'), 'false');
+    b.revealButton.fire('click');
+    b.key('d');
+    assert.equal(hidden(), false, 'so does the D key');
   }
 });
 

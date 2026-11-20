@@ -298,23 +298,10 @@ nav a[aria-current="page"] {
   :root:not(.light) .theme-icon-moon { display: none; }
 }
 
-/* The grid button hides the page's text box so the background shows whole. */
-.intro,
-body:not(.home) main {
-  transition: opacity 0.2s ease, visibility 0.2s;
-}
-
+/* The grid button hides the page's text box, at once, so the background shows whole. */
 :root.content-hidden .intro,
 :root.content-hidden body:not(.home) main {
-  opacity: 0;
   visibility: hidden;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .intro,
-  body:not(.home) main {
-    transition: none;
-  }
 }
 
 /* Headings --------------------------------------------------------------- */
@@ -465,9 +452,28 @@ body.home main {
   color: var(--muted);
 }
 
+/* Profile links as icons (Simple Icons paths, CC0), drawn in the text color. */
 .page-links {
+  display: flex;
+  gap: 0.85rem;
   margin: 0 0 0.35rem;
-  color: var(--muted);
+}
+
+.page-links a {
+  display: flex;
+  padding: 0.25rem; /* a comfortable target around a small glyph */
+  margin: -0.25rem;
+  color: var(--text);
+}
+
+.page-links a:hover {
+  color: var(--accent);
+}
+
+.page-links svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  fill: currentColor;
 }
 
 /* CV --------------------------------------------------------------------- */
@@ -746,9 +752,7 @@ body.home main {
     border: none !important;
     background: none !important;
     box-shadow: none !important;
-    opacity: 1 !important;
     visibility: visible !important;
-    transition: none !important;
   }
 
   .intro::before,

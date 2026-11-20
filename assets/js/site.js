@@ -37,6 +37,7 @@
   function refreshTheme() {
     background.apply();
     label();
+    setContentHidden(false); // a theme switch brings the text back, like a new page
     emit("themechange");
   }
 
@@ -72,7 +73,8 @@
 
   /* --- Text-box toggle ---------------------------------------------------
      The grid button hides the page's text box (the bio on the home page), so
-     the skydiver or the moon behind it shows whole. Press again to restore. */
+     the skydiver or the moon behind it shows whole. Pressing it again,
+     switching the theme or opening another page brings the text back. */
 
   function setContentHidden(hidden) {
     root.classList.toggle("content-hidden", hidden);
