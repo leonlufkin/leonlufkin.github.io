@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Research · Leon Lufkin</title>
+  <meta name="description" content="Technical reports and publications by Leon Lufkin.">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <script>/* Pre-paint: theme, background, and the first impression. Identical on every page. */
+(function () {
+  var root = document.documentElement;
+  // Light theme: the layered Monterey Bay scene (drawn by landscape.js).
+  // Dark theme: the moon photograph. Nothing here depends on the page.
+  var scene = { width: 1721, height: 771, minHeight: 933, edge: { sides: "#72bcf6", caps: "#0056bb" } };
+  var moon = { u: "/assets/backgrounds/dark/home_moon2.jpg", width: 1600, height: 1200,
+    edge: { sides: "#010101", caps: "#010102" }, subject: { x: 445, y: 200, width: 819, height: 810 } };
+  // The code that draws the scene, and the script that brings everything after the first impression.
+  var code = ["/assets/js/landscape-scene.js?v=6", "/assets/js/landscape-gpu.js?v=7", "/assets/js/landscape.js?v=13"];
+  var rest = "/assets/js/site.js?v=40";
+  // The visitor's own choice of theme is kept only while it differs from the
+  // system's. Once the system agrees with it, it is dropped, and the site
+  // follows the system again.
+  function system() { return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"; }
+  function stored() {
+    try {
+      var t = localStorage.getItem("theme-override");
+      if (t === system()) localStorage.removeItem("theme-override");
+      else if (t === "light" || t === "dark") return t;
+    } catch (e) {}
+    return null;
+  }
+  function dark() {
+    return (stored() || system()) === "dark";
+  }
+  // The scene's layers come as 0.5x, 1x and 2x bitmaps of its source frame:
+  // take the smallest that fills the canvas, which draws at 2x at most.
+  function density() {
+    var need = Math.min(innerWidth / scene.width, innerHeight / scene.minHeight) * Math.min(window.devicePixelRatio || 1, 2);
+    return need > 1.1 ? 2 : need > 0.55 ? 1 : 0.5;
+  }
+  // Their version rises when the bitmaps are redrawn, so no stored copy is shown for a new one.
+  function layers(set) {
+    return ["sky", "coast", "diver"].map(function (name) {
+      return "/assets/images/skydiving-" + name + "-" + set + "x.webp?v=3";
+    });
+  }
+  function apply() {
+    var theme = stored(), night = dark(), e = night ? moon : scene, style = root.style;
+    var aspect = e.width / e.height, wide = Math.max(1, innerWidth) / Math.max(1, innerHeight) >= aspect;
+    root.classList.toggle("dark", theme === "dark");
+    root.classList.toggle("light", theme === "light");
+    root.classList.toggle("has-landscape", !night);
+    root.classList.toggle("has-photo", night);
+    style.setProperty("--sky", e.edge[wide ? "sides" : "caps"]);
+    if (!night) return;
+    style.setProperty("--bg-image", 'url("' + moon.u + '")');
+    style.setProperty("--photo-ratio", String(aspect));
+    style.setProperty("--photo-inverse", String(1 / aspect));
+    style.setProperty("--photo-seam", "linear-gradient(to " + (wide ? "right" : "bottom") +
+      ", transparent, #000 var(--photo-feather), #000 calc(100% - var(--photo-feather)), transparent)");
+    // Hold the moon's disc on the center of the viewport.
+    style.setProperty("--photo-shift-x", String(0.5 - (moon.subject.x + moon.subject.width / 2) / moon.width));
+    style.setProperty("--photo-shift-y", String(0.5 - (moon.subject.y + moon.subject.height / 2) / moon.height));
+  }
+  // High priority: WebKit holds back low-priority files, and the scene cannot
+  // draw until the last of them is in.
+  function preload(as, url) {
+    var link = document.createElement("link");
+    link.rel = "preload"; link.as = as; link.fetchPriority = "high"; link.href = url;
+    document.head.appendChild(link);
+  }
+  // The scene's files run in the order added, and report one that cannot
+  // load; nothing else waits behind them.
+  function run(url, scene) {
+    var script = document.createElement("script");
+    script.async = !scene; script.src = url;
+    if (scene) script.onerror = drawn;
+    document.head.appendChild(script);
+  }
+  // Load the scene's code once the page is parsed: it draws into the body.
+  var drawing = false;
+  function draw() {
+    if (drawing) return;
+    drawing = true;
+    var start = function () { code.forEach(function (url) { run(url, true); }); };
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
+    else start();
+  }
+  // First impression: the text is held back (:root.loading) until the page's
+  // own files are in and its background is on screen, so that both appear in
+  // one frame. A file that fails is not waited for, and none is waited for
+  // longer than `patience` (ms): on a slow connection the text comes first,
+  // and the background when it is there.
+  // Only then is the rest fetched: navigation, the other pages, the other theme.
+  var loaded = false, painted = false, shown = false, resting = false, patience = 1500;
+  function more() {
+    if (resting) return;
+    resting = true;
+    run(rest);
+  }
+  function show() {
+    if (shown || !loaded || !painted) return;
+    shown = true;
+    root.classList.remove("loading");
+    requestAnimationFrame(function () { setTimeout(more, 0); }); // after that frame
+    setTimeout(more, 1000); // a hidden tab draws no frame
+  }
+  function drawn() { painted = true; show(); }
+  // What the worker reports is kept until site.js, which acts on it, has arrived.
+  var api = window.SiteBackground = { apply: apply, dark: dark, density: density, layers: layers, photo: moon.u, draw: draw, drawn: drawn, early: [] };
+  if (navigator.serviceWorker) navigator.serviceWorker.addEventListener("message", function (e) { if (api.early) api.early.push(e.data); });
+  apply();
+  root.classList.add("loading");
+  setTimeout(function () { loaded = painted = true; show(); }, patience);
+  if (dark()) {
+    var photo = new Image();
+    photo.fetchPriority = "high"; photo.src = moon.u;
+    if (photo.decode) photo.decode().then(drawn, drawn);
+    else photo.onload = photo.onerror = drawn;
+  } else {
+    layers(density()).forEach(function (url) { preload("image", url); });
+    code.forEach(function (url) { preload("script", url); });
+    draw();
+  }
+  window.addEventListener("load", function () {
+    var ready = function () { loaded = true; show(); };
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(ready, ready); else ready();
+  });
+})();</script>
+  <link rel="preload" href="assets/fonts/lmroman-regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/lmroman-bold.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/lmroman-italic.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/lmroman-regular-ext.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="assets/css/style.css?v=71">
+</head>
+
+<body>
+  <header>
+    <nav>
+      <a href="index.html">Leon</a>
+      <a href="research.html" aria-current="page">Research</a>
+      <a href="cv.html">CV</a>
+      <button type="button" class="theme-toggle" aria-label="Switch color theme">
+        <span class="theme-icon theme-icon-sun" aria-hidden="true">☀︎</span>
+        <span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span>
+      </button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- TODO: add a Research Topics section here (Leon, July 2026) -->
+    <p class="page-links">
+      <a href="https://scholar.google.com/citations?user=nIReXFoAAAAJ&amp;hl=en" aria-label="Google Scholar" title="Google Scholar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.242 13.769L0 9.5 12 0l12 9.5-5.242 4.269C17.548 11.249 14.978 9.5 12 9.5c-2.977 0-5.548 1.748-6.758 4.269zM12 10a7 7 0 1 0 0 14 7 7 0 0 0 0-14z"/></svg></a>
+      <a href="https://x.com/leonlufkin" aria-label="X" title="X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.234 10.162 22.977 0h-2.072l-7.591 8.824L7.251 0H.258l9.168 13.343L.258 24H2.33l8.016-9.318L16.749 24h6.993zm-2.837 3.299-.929-1.329L3.076 1.56h3.182l5.965 8.532.929 1.329 7.754 11.09h-3.182z"/></svg></a>
+    </p>
+    <ul class="pubs">
+      <li class="pub">
+        <p class="pub-title"><a href="https://arxiv.org/abs/2611.26935">Self-similar organization of information in language</a></p>
+        <p class="pub-authors"><span class="me">Leon Lufkin</span>, Cutter Dawes, Kamesh Krishnamurthy</p>
+        <p class="pub-meta"><span>Preprint, 2026</span> <span class="right"><a href="https://arxiv.org/abs/2611.26935">Paper</a></span></p>
+      </li>
+
+      <li class="pub">
+        <p class="pub-title"><a href="https://arxiv.org/abs/2610.42112">Subquadratic attention with a hierarchical tree-structured indexer</a></p>
+        <p class="pub-authors"><span class="me">Leon Lufkin</span>, Cutter Dawes, Alexander Speicher, Kamesh Krishnamurthy, Tomás Figliolia, Beren Millidge</p>
+        <p class="pub-meta"><span class="nowrap">Technical Report, 2026</span> <span class="right"><a href="https://arxiv.org/abs/2610.42112">Paper</a> &middot; <a href="https://www.zyphra.com/our-work/zyphra-hierarchical-attention">Blog 1</a> &middot; <a href="https://www.zyphra.com/our-work/scaling-zha">Blog 2</a></span></p>
+      </li>
+
+      <li class="pub">
+        <p class="pub-title"><a href="https://arxiv.org/abs/2603.22325">Hybrid associative memories</a></p>
+        <p class="pub-authors"><span class="me">Leon Lufkin</span>, Tomás Figliolia, Beren Millidge, Kamesh Krishnamurthy</p>
+        <p class="pub-meta"><span class="nowrap">Technical Report, 2026</span> <span class="right"><a href="https://arxiv.org/abs/2603.22325">Paper</a> &middot; <a href="https://www.zyphra.com/our-work/ham">Blog</a></span></p>
+      </li>
+
+      <li class="pub">
+        <p class="pub-title"><a href="https://proceedings.neurips.cc/paper_files/paper/2024/hash/2dab2f94544f9297d01a46a5453b93cd-Abstract-Conference.html">Nonlinear dynamics of localization in neural receptive fields</a></p>
+        <p class="pub-authors"><span class="me">Leon Lufkin</span>, Andrew Saxe, Erin Grant</p>
+        <p class="pub-meta"><span><em>Advances in Neural Information Processing Systems (NeurIPS)</em>, 2024</span> <span class="right"><a href="https://proceedings.neurips.cc/paper_files/paper/2024/hash/2dab2f94544f9297d01a46a5453b93cd-Abstract-Conference.html">Paper</a></span></p>
+        <p class="pub-note">Spotlight (&lt;4% of submissions)</p>
+      </li>
+
+      <li class="pub">
+        <p class="pub-title"><a href="https://arxiv.org/abs/2402.09693">Sharp information-theoretic thresholds for shuffled linear regression</a></p>
+        <p class="pub-authors"><span class="me">Leon Lufkin</span>, Yihong Wu, Jiaming Xu</p>
+        <p class="pub-meta"><span><em>International Symposium on Information Theory (ISIT)</em>, 2024</span> <span class="right"><a href="https://arxiv.org/abs/2402.09693">Paper</a></span></p>
+      </li>
+
+      <li class="pub">
+        <p class="pub-title"><a href="https://arxiv.org/abs/2309.00597">The QUATRO application suite: quantum computing for models of human cognition</a></p>
+        <p class="pub-authors">Raghavendra Pothukuchi, <span class="me">Leon Lufkin</span>, &hellip;, Jonathan Cohen, Abhishek Bhattacharjee</p>
+        <p class="pub-meta"><span>Preprint, 2023</span> <span class="right"><a href="https://arxiv.org/abs/2309.00597">Paper</a></span></p>
+      </li>
+
+      <li class="pub">
+        <p class="pub-title"><a href="https://www.frontiersin.org/journals/epidemiology/articles/10.3389/fepid.2023.1216497/full">A stronger association of depression with rheumatoid arthritis in presence of obesity and hypertriglyceridemia</a></p>
+        <p class="pub-authors">Grayden Shand, Daniel T. Fuller, <span class="me">Leon Lufkin</span>, Carly Lovelett, Nabendu Pal, Sumona Mondal, Shantanu Sur</p>
+        <p class="pub-meta"><span><em>Frontiers in Epidemiology</em>, 2023</span> <span class="right"><a href="https://www.frontiersin.org/journals/epidemiology/articles/10.3389/fepid.2023.1216497/full">Paper</a></span></p>
+      </li>
+
+      <li class="pub">
+        <p class="pub-title"><a href="https://www.frontiersin.org/journals/molecular-biosciences/articles/10.3389/fmolb.2022.1009402/full">Glis1 and oxaloacetate in nucleus pulposus stromal cell somatic reprogramming and survival</a></p>
+        <p class="pub-authors"><span class="me">Leon Lufkin</span>, Ankita Samanta, &hellip;, Petra Kraus</p>
+        <p class="pub-meta"><span><em>Frontiers in Molecular Biosciences</em>, 2022</span> <span class="right"><a href="https://www.frontiersin.org/journals/molecular-biosciences/articles/10.3389/fmolb.2022.1009402/full">Paper</a></span></p>
+      </li>
+
+      <li class="pub">
+        <p class="pub-title"><a href="https://arxiv.org/abs/2205.13614">Emergent organization of receptive fields in networks of excitatory and inhibitory neurons</a></p>
+        <p class="pub-authors"><span class="me">Leon Lufkin</span>, Ashish Puri, Ganlin Song, Xinyi Zhong, John Lafferty</p>
+        <p class="pub-meta"><span>Preprint, 2022</span> <span class="right"><a href="https://arxiv.org/abs/2205.13614">Paper</a></span></p>
+      </li>
+
+      <li class="pub">
+        <p class="pub-title"><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8415718/">A Bayesian model to analyze the association of rheumatoid arthritis with risk factors and their interactions</a></p>
+        <p class="pub-authors"><span class="me">Leon Lufkin</span>, Marko Budišić, Sumona Mondal, Shantanu Sur</p>
+        <p class="pub-meta"><span><em>Frontiers in Public Health</em>, 2021</span> <span class="right"><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8415718/">Paper</a></span></p>
+      </li>
+    </ul>
+  </main>
+
+</body>
+</html>

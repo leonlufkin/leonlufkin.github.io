@@ -1,0 +1,825 @@
+/* Leon Lufkin — personal site. Single stylesheet.
+   Light/dark follows the system preference (overridable via the toggle). */
+
+/* Latin Modern — Knuth's Computer Modern as OpenType (GUST, GUST Font License):
+   the genuine LaTeX face, self-hosted. Each style comes in two files: the
+   characters the pages use every day, and the rest of the Latin range, which
+   unicode-range fetches only when a page needs it. font-display: swap means
+   neither blocks first paint; Georgia is the fallback until they load. */
+@font-face {
+  font-family: "Latin Modern Roman";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/lmroman-regular.woff2") format("woff2");
+  unicode-range: U+0020-007E, U+00A0, U+00B7, U+2013-2014, U+2018-2019, U+201C-201D, U+2026, U+2212;
+}
+@font-face {
+  font-family: "Latin Modern Roman";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/lmroman-regular-ext.woff2") format("woff2");
+  unicode-range: U+00A1-00B6, U+00B8-017F, U+2000-2012, U+2015-2017, U+201A-201B, U+201E-2025, U+2027-206F;
+}
+@font-face {
+  font-family: "Latin Modern Roman";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/lmroman-italic.woff2") format("woff2");
+  unicode-range: U+0020-007E, U+00A0, U+00B7, U+2013-2014, U+2018-2019, U+201C-201D, U+2026, U+2212;
+}
+@font-face {
+  font-family: "Latin Modern Roman";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/lmroman-italic-ext.woff2") format("woff2");
+  unicode-range: U+00A1-00B6, U+00B8-017F, U+2000-2012, U+2015-2017, U+201A-201B, U+201E-2025, U+2027-206F;
+}
+@font-face {
+  font-family: "Latin Modern Roman";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/lmroman-bold.woff2") format("woff2");
+  unicode-range: U+0020-007E, U+00A0, U+00B7, U+2013-2014, U+2018-2019, U+201C-201D, U+2026, U+2212;
+}
+@font-face {
+  font-family: "Latin Modern Roman";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/lmroman-bold-ext.woff2") format("woff2");
+  unicode-range: U+00A1-00B6, U+00B8-017F, U+2000-2012, U+2015-2017, U+201A-201B, U+201E-2025, U+2027-206F;
+}
+@font-face {
+  font-family: "Latin Modern Roman";
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/lmroman-bolditalic.woff2") format("woff2");
+  unicode-range: U+0020-007E, U+00A0, U+00B7, U+2013-2014, U+2018-2019, U+201C-201D, U+2026, U+2212;
+}
+@font-face {
+  font-family: "Latin Modern Roman";
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/lmroman-bolditalic-ext.woff2") format("woff2");
+  unicode-range: U+00A1-00B6, U+00B8-017F, U+2000-2012, U+2015-2017, U+201A-201B, U+201E-2025, U+2027-206F;
+}
+
+/* Metric-matched fallback: local Georgia adjusted to Latin Modern's metrics,
+   so the font swap on first visit causes (near) zero layout shift */
+@font-face {
+  font-family: "Georgia LM";
+  src: local("Georgia");
+  size-adjust: 98.64%;
+  ascent-override: 114.25%;
+  descent-override: 29.4%;
+  line-gap-override: 0%;
+}
+
+:root {
+  /* --photo-seam is defined here by the page bootstrap, so its width dependency
+     must resolve here too, before the computed gradient is inherited by ::after. */
+  --photo-feather: var(--photo-blend-width, 12%);
+  --bg: #ffffff;
+  --text: #1a1a1a;
+  --muted: #666666;
+  --line: #e5e5e5;
+  --accent: #0645ad;
+  --accent-soft: #dce6f5;
+  --wash: rgba(255, 255, 255, 0.63);
+  --sky: #72bcf6; /* flat fill behind the background; the bootstrap matches it to the artwork's edge */
+}
+
+/* Dark palette applies when forced via the toggle (html.dark), or — for the
+   initial visit / no-JS — when the system prefers dark and light isn't forced */
+:root.dark {
+  --bg: #141414;
+  --text: #e8e8e8;
+  --muted: #9a9a9a;
+  --line: #2a2a2a;
+  --accent: #8cb4ff;
+  --accent-soft: #1c2c4a;
+  --wash: rgba(14, 14, 14, 0.65);
+  --sky: #010101;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --bg: #141414;
+    --text: #e8e8e8;
+    --muted: #9a9a9a;
+    --line: #2a2a2a;
+    --accent: #8cb4ff;
+    --accent-soft: #1c2c4a;
+    --wash: rgba(14, 14, 14, 0.65);
+    --sky: #010101;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: light dark;
+}
+
+.print-only {
+  display: none;
+}
+
+/* The background is fixed to the viewport and depends on the theme alone: the
+   layered Monterey Bay scene in light mode, the moon in dark mode. Both are
+   sized from vw and the large viewport height, so page content, scrollbars and
+   mobile browser bars never resize them.
+
+   A wash of the page color lies over the flat fill and over the photo, so the
+   photo's feathered boundary melts into the fill. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -4;
+  pointer-events: none;
+  background: linear-gradient(var(--wash), var(--wash)), var(--sky);
+}
+
+/* The moon, shown whole (contain scale) with its disc on the viewport's center. */
+.has-photo body::after {
+  content: "";
+  position: fixed;
+  left: 50vw;
+  top: 50vh;
+  width: min(100vw, calc(100vh * var(--photo-ratio)));
+  height: min(100vh, calc(100vw * var(--photo-inverse)));
+  transform: translate(calc(-50% + var(--photo-shift-x, 0) * 100%), calc(-50% + var(--photo-shift-y, 0) * 100%));
+  z-index: -2;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--wash), var(--wash)),
+    var(--bg-image) center / contain no-repeat;
+  -webkit-mask-image: var(--photo-seam, none);
+  mask-image: var(--photo-seam, none);
+}
+
+/* The layered scene owns its visible pixels and takes a lighter wash. */
+:root.has-landscape:not(.dark) { --wash: rgba(255, 255, 255, 0.25); }
+@media (prefers-color-scheme: dark) {
+  :root.has-landscape:not(.light) { --wash: rgba(14, 14, 14, 0.65); }
+}
+/* The stage stays laid out while hidden so the scene can be prepared behind the
+   moon. It hangs from the bottom of the window: where a browser's bars leave
+   less than its height showing, the photograph at its foot stays in view, and
+   what is cut off is sky at the top. */
+#landscape-stage {
+  visibility: hidden;
+  position: fixed;
+  z-index: -2;
+  bottom: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  pointer-events: none;
+  contain: layout paint;
+}
+.has-landscape #landscape-stage.is-ready { visibility: visible; }
+
+/* First impression: the bootstrap holds the text and the background back until
+   both are ready, then shows them in one frame. The flat fill shows meanwhile. */
+:root.loading body > header,
+:root.loading body > main,
+:root.loading body::after,
+:root.loading #landscape-stage {
+  visibility: hidden;
+}
+
+.landscape-fill,
+.landscape-gpu {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+.landscape-gpu { display: none; }
+.has-gpu .landscape-gpu { display: block; }
+.has-gpu .landscape-fill { display: none; }
+
+/* Where the browser's bars come and go, hold both backgrounds to the largest
+   viewport: they then keep their size while the bars slide over them. */
+@supports (height: 100lvh) {
+  .has-photo body::after {
+    top: 50lvh;
+    width: min(100vw, calc(100lvh * var(--photo-ratio)));
+    height: min(100lvh, calc(100vw * var(--photo-inverse)));
+  }
+  #landscape-stage { height: 100lvh; }
+}
+
+body {
+  margin: 0 auto;
+  max-width: 44rem;
+  padding: 3.25rem 1.5rem 2.5rem;
+  overflow-x: hidden; /* the cloud plates extend past the boxes */
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Latin Modern Roman", "Georgia LM", Georgia, "Times New Roman", Times, serif;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+/* Hover styles, all of them. They apply only where a pointer can hover, and
+   only once it has moved: after a page swap, what lands under the finger that
+   tapped or under a resting pointer is not highlighted (site.js sets
+   .pointer-still until the pointer really moves). */
+@media (hover: hover) {
+  :root:not(.pointer-still) a:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  :root:not(.pointer-still) nav a:hover {
+    text-decoration-thickness: 2px;
+  }
+
+  :root:not(.pointer-still) .pub-title a:hover {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  :root:not(.pointer-still) .page-links a:hover,
+  :root:not(.pointer-still) .cv-sub a:hover {
+    color: var(--accent);
+  }
+}
+
+/* Navigation ------------------------------------------------------------- */
+
+header {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 3rem;
+}
+
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.6rem;
+}
+
+nav a {
+  color: var(--text);
+  font-size: 1rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+nav a[aria-current="page"] {
+  font-weight: 700;
+}
+
+/* Initial-markup theme control ------------------------------------------- */
+
+.theme-toggle {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 1.0625rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* Text glyphs, never emoji; the theme icon shows the mode you'd switch TO. */
+.theme-icon {
+  display: block;
+  font-variant-emoji: text;
+}
+
+.theme-icon-sun { display: none; }
+:root.dark .theme-icon-sun { display: block; }
+:root.dark .theme-icon-moon { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) .theme-icon-sun { display: block; }
+  :root:not(.light) .theme-icon-moon { display: none; }
+}
+
+/* Esc hides the page's text box, at once, so the background shows whole. */
+:root.content-hidden .intro,
+:root.content-hidden body:not(.home) main {
+  visibility: hidden;
+}
+
+/* The home page's nav sits under its box; with the box hidden it goes to the
+   top, where the other pages have theirs. */
+:root.content-hidden body.home main {
+  justify-content: flex-start;
+}
+
+:root.content-hidden body.home nav {
+  order: -1;
+}
+
+/* The typeset PDF, shown inside the page on a desktop (site.js): edge to edge,
+   over everything, in place of the page's own scrolling. */
+.pdf-view {
+  position: fixed;
+  z-index: 10;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--bg);
+}
+
+:root.pdf-open {
+  overflow: hidden;
+}
+
+@media print {
+  .pdf-view {
+    display: none;
+  }
+}
+
+/* Headings --------------------------------------------------------------- */
+
+h1 {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+h2 {
+  margin: 1.75rem 0 0.55rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+/* Content pages (research, CV, 404): same box as home, tighter and denser.
+   Default box: solid fill + hairline border. An optional cloud halo (the
+   ::before plate, opt-in via the preview tool) can feather it into the photo:
+     --cloud-display  block to show the halo (default: hidden)
+     --cloud-reach    how far the plate extends beyond the box
+     --cloud-blur     softness of the falloff
+     --box-fill       fill color/opacity (preview tool can override) */
+body:not(.home) main {
+  position: relative;
+  padding: 1.4rem 1.6rem 1.8rem;
+  background: var(--box-fill, var(--bg));
+  border: 1px solid var(--text);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.intro::before,
+body:not(.home) main::before {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--cloud-reach, 0px));
+  z-index: -1;
+  display: var(--cloud-display, none);
+  background: var(--box-fill, var(--bg));
+  border-radius: var(--cloud-radius, 24px);
+  filter: blur(var(--cloud-blur, 0px));
+}
+
+/* Home ------------------------------------------------------------------- */
+
+body.home {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100svh;
+}
+
+body.home main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.6rem;
+}
+
+.intro {
+  position: relative;
+  max-width: 36rem;
+  padding: 2rem 2.25rem;
+  background: var(--box-fill, var(--bg));
+  border: 1px solid var(--text);
+  text-align: center;
+}
+
+.headshot {
+  display: block;
+  width: 158px;
+  height: auto;
+  margin: 0 auto 0.55rem;
+}
+
+.intro-name {
+  margin: 0 0 1.2rem;
+  font-style: italic;
+}
+
+.intro p {
+  margin: 0 0 1.1rem;
+}
+
+.intro p:last-child {
+  margin-bottom: 0;
+}
+
+/* Publications ----------------------------------------------------------- */
+
+.pubs {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pub {
+  padding: 0.7rem 0;
+}
+
+.pub + .pub {
+  border-top: 1px solid var(--line);
+}
+
+.pub p {
+  margin: 0;
+}
+
+.pub-title {
+  font-weight: 700;
+}
+
+.pub-title a {
+  color: inherit;
+}
+
+.pub-authors {
+  margin-top: 0.05rem;
+}
+
+.me {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* The venue and year on the left, the links on the right, on one line. A venue
+   too long for that breaks beside the links rather than pushing them down;
+   only links that cannot fit beside it at all go under it. */
+.pub-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.15rem 0.5rem;
+  margin-top: 0.1rem;
+  color: var(--muted);
+}
+
+.pub-meta > :first-child {
+  flex: 1; /* as narrow as its longest word, if the links need the room */
+}
+
+/* The links stay whole, and so does a label short enough to (.nowrap). */
+.pub-meta .right,
+.pub-meta .nowrap {
+  white-space: nowrap;
+}
+
+.pub-note {
+  margin-top: 0.05rem;
+  color: var(--muted);
+}
+
+/* Profile links as icons (Simple Icons paths, CC0), drawn in the text color. */
+.page-links {
+  display: flex;
+  gap: 0.85rem;
+  margin: 0 0 0.35rem;
+}
+
+.page-links a {
+  display: flex;
+  padding: 0.25rem; /* a comfortable target around a small glyph */
+  margin: -0.25rem;
+  color: var(--text);
+}
+
+.page-links svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  fill: currentColor;
+}
+
+/* CV --------------------------------------------------------------------- */
+
+.cv-contact {
+  margin: -0.7rem 0 0;
+  color: var(--muted);
+}
+
+/* E-mail addresses sit in the markup reversed and without their "@", so a
+   harvester reading the HTML finds no address. These rules show them the right
+   way round until site.js swaps in the real text and link. */
+.email-rev {
+  unicode-bidi: bidi-override;
+  unicode-bidi: isolate-override; /* neighbouring addresses keep their order */
+  direction: rtl;
+}
+
+.email-rev .at::before {
+  content: "@";
+}
+
+.cv-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.15rem 1.5rem;
+  margin-bottom: 0.8rem;
+}
+
+.cv-item:last-child {
+  margin-bottom: 0;
+}
+
+.cv-main {
+  flex: 1;
+  min-width: 0;
+}
+
+/* label on the left, value pushed to the right edge */
+.cv-split {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.15rem 1rem;
+}
+
+.cv-sup {
+  font-style: italic;
+}
+
+.wrapok {
+  white-space: normal;
+  text-align: right;
+}
+
+.cv-title {
+  margin: 0;
+  font-weight: 700;
+}
+
+.cv-sub {
+  margin: 0.05rem 0 0;
+  color: var(--muted);
+}
+
+.cv-sub a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 3px;
+}
+
+/* right-hand column stacking a date with lines under it, right-aligned */
+.cv-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.cv-date {
+  flex-shrink: 0;
+  padding-top: 0.1rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.cv-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cv-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.15rem 1.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.cv-list li > span:first-child {
+  min-width: 0;
+}
+
+.cv-prose {
+  margin: 0;
+}
+
+/* Small screens ---------------------------------------------------------- */
+
+@media (max-width: 620px) {
+  body {
+    padding-top: 2.25rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  body:not(.home) main {
+    padding: 1.2rem 1rem 1.5rem;
+  }
+
+  .intro {
+    padding: 1.5rem 1.25rem;
+  }
+
+  .cv-item,
+  .cv-list li {
+    flex-direction: column;
+  }
+
+  .cv-right {
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .cv-date {
+    padding-top: 0;
+  }
+}
+
+/* Print: render the CV as a clean LaTeX-style document — no photo, no chrome,
+   just black text on white. Screen appearance is unaffected. ------------- */
+
+@media print {
+  :root,
+  :root.dark,
+  :root.light {
+    --bg: #fff;
+    --text: #000;
+    --muted: #000;
+    --line: #000;
+    --accent: #000;
+  }
+
+  @page {
+    margin: 0.75in;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  body {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+    color: #000;
+    font-family: "Latin Modern Roman", "Times New Roman", Times, serif;
+    font-size: 10.5pt;
+    line-height: 1.35;
+  }
+
+  /* strip everything that isn't the CV text */
+  body::before,
+  body::after,
+  #landscape-stage,
+  main::before,
+  header,
+  nav,
+  .theme-toggle,
+  #style-switcher,
+  .screen-only {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  body:not(.home) main {
+    position: static;
+    padding: 0;
+    border: none;
+    background: none;
+    font-size: 10.5pt;
+    line-height: 1.35;
+  }
+
+  /* centered name title, like a LaTeX \title */
+  .cv-printhead {
+    text-align: center;
+    margin-bottom: 1.1rem;
+  }
+
+  .cv-printhead h1 {
+    margin: 0 0 0.2rem;
+    font-size: 20pt;
+    font-weight: 700;
+  }
+
+  .cv-printhead p {
+    margin: 0;
+    font-size: 10.5pt;
+  }
+
+  /* section headings: bold title-case, no rule — exactly like the LaTeX CV */
+  h2 {
+    margin: 1.05rem 0 0.4rem;
+    font-size: 12.5pt;
+    font-weight: 700;
+    break-after: avoid;
+  }
+
+  a {
+    color: #000;
+    text-decoration: none;
+  }
+
+  .cv-sub a {
+    text-decoration: none;
+  }
+
+  /* don't split an entry across a page break */
+  .cv-item,
+  .cv-list li {
+    break-inside: avoid;
+    margin-bottom: 0.45rem;
+  }
+
+  .cv-list li {
+    margin-bottom: 0.2rem;
+  }
+
+  /* LaTeX itemize: "– Supervised by …" with hanging indent; description
+     lines align under the text after the dash, with no dash of their own */
+  .cv-main .cv-sub {
+    padding-left: 2.05em;
+  }
+
+  .cv-main p.cv-sup {
+    text-indent: -0.85em;
+  }
+
+  .cv-sup::before {
+    content: "\2013\00a0";
+  }
+
+  .cv-main .cv-split {
+    padding-left: 1.2em; /* flex row: dash renders inline inside the span */
+  }
+
+  .cv-list li {
+    padding-left: 1.2em;
+  }
+
+  .cv-list li::before {
+    content: "\2013";
+    margin-right: 0.45em;
+  }
+
+  /* belt-and-suspenders: never print a box on any page, and always print the text */
+  .intro,
+  body:not(.home) main {
+    border: none !important;
+    background: none !important;
+    box-shadow: none !important;
+    visibility: visible !important;
+  }
+
+  .intro::before,
+  body:not(.home) main::before {
+    display: none !important;
+  }
+}
